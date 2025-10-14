@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "LinkedIn AI Premium",
+  "version": "1.0.0",
+  "description": "AI-powered chat assistant for LinkedIn profiles using Gemini",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*.linkedin.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/in/*"],
+      "js": [
+        "utils/date-formatter.js",
+        "utils/storage-manager.js",
+        "content/scraper.js",
+        "content/content-script.js"
+      ],
+      "css": ["content/content-styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*", "popup/*"],
+      "matches": ["https://*.linkedin.com/*"]
+    }
+  ],
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "options/settings.html",
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "48": "assets/icons/icon48.png"
+    }
+  }
+}
+

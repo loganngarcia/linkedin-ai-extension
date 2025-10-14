@@ -1,0 +1,290 @@
+/* Settings Page Styles */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #0F1419;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.6;
+  min-width: 650px; /* Make popup wider */
+}
+
+.settings-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.header-icon {
+  display: inline-block;
+  margin-bottom: 16px;
+}
+
+h1 {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+header p {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.settings-section {
+  background: #1A2024;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.settings-section h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.setting-item {
+  margin-bottom: 20px;
+}
+
+.setting-item label {
+  display: block;
+  font-size: 14px;
+  font-weight: 590;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.input-group input {
+  flex: 1;
+  padding: 12px;
+  background: #2D3339;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 14px;
+  font-family: system-ui, -apple-system, sans-serif;
+  transition: border-color 150ms ease;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: #71B7FB;
+}
+
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  background: #2D3339;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 150ms ease;
+}
+
+.icon-btn:hover {
+  background: #373B3E;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.setting-description {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: 8px;
+}
+
+.setting-description a {
+  color: #71B7FB;
+  text-decoration: none;
+}
+
+.setting-description a:hover {
+  text-decoration: underline;
+}
+
+.setting-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn-primary {
+  flex: 1;
+  padding: 12px 24px;
+  background: #71B7FB;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  font-weight: 590;
+  font-family: system-ui, -apple-system, sans-serif;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.btn-primary:hover {
+  background: #5BA3E8;
+}
+
+.btn-secondary {
+  flex: 1;
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.10);
+  border: none;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 14px;
+  font-weight: 590;
+  font-family: system-ui, -apple-system, sans-serif;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-danger {
+  flex: 1;
+  padding: 12px 24px;
+  background: rgba(255, 59, 48, 0.1);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  border-radius: 8px;
+  color: #FF3B30;
+  font-size: 14px;
+  font-weight: 590;
+  font-family: system-ui, -apple-system, sans-serif;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.btn-danger:hover {
+  background: rgba(255, 59, 48, 0.2);
+  border-color: rgba(255, 59, 48, 0.5);
+}
+
+.status-message {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  display: none;
+}
+
+.status-message.success {
+  background: rgba(52, 199, 89, 0.1);
+  border: 1px solid rgba(52, 199, 89, 0.3);
+  color: #34C759;
+  display: block;
+}
+
+.status-message.error {
+  background: rgba(255, 59, 48, 0.1);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  color: #FF3B30;
+  display: block;
+}
+
+.about-info {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.about-info p {
+  margin-bottom: 8px;
+}
+
+.about-info strong {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 590;
+}
+
+.about-info a {
+  color: #71B7FB;
+  text-decoration: none;
+}
+
+.about-info a:hover {
+  text-decoration: underline;
+}
+
+/* Profile Preview */
+.profile-preview {
+  margin-top: 20px;
+  padding: 16px;
+  background: #2D3339;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.profile-preview h3 {
+  font-size: 14px;
+  font-weight: 590;
+  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.profile-preview-content {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.profile-preview-content img {
+  flex-shrink: 0;
+}
+
+.profile-preview-content div {
+  flex: 1;
+}
+
+.profile-preview-content p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .settings-container {
+    padding: 20px 16px;
+  }
+
+  .setting-actions {
+    flex-direction: column;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    width: 100%;
+  }
+}
+

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LinkedIn AI Premium - Settings</title>
+  <link rel="stylesheet" href="settings-styles.css">
+</head>
+<body>
+  <div class="settings-container">
+    <header>
+      <div class="header-icon">
+        <svg width="48" height="48" viewBox="0 0 65 65" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0.84375" y="0.735352" width="64" height="64" rx="32" fill="white" fill-opacity="0.95"/>
+          <path d="M48.8438 32.7125C48.8438 33.6039 48.2042 34.3125 47.3591 34.4039C40.6439 35.1354 35.2763 40.5296 34.5226 47.2496C34.4312 48.0954 33.7003 48.7354 32.8552 48.7354H32.8323C31.9872 48.7354 31.2563 48.0954 31.165 47.2496C30.434 40.5296 25.0436 35.1582 18.3284 34.4039C17.9196 34.3563 17.5425 34.16 17.2687 33.8524C16.995 33.5448 16.8438 33.1472 16.8438 32.7354C16.8438 31.8439 17.4833 31.1354 18.3284 31.0439C25.0436 30.3125 30.4112 24.9182 31.1421 18.2211C31.2335 17.3754 31.9644 16.7354 32.8095 16.7354H32.8552C33.7003 16.7354 34.4312 17.3754 34.5226 18.2211C35.2535 24.9411 40.6439 30.3125 47.3591 31.0668C48.2042 31.1582 48.8438 31.8896 48.8438 32.7354V32.7125Z" fill="#D07A00"/>
+        </svg>
+      </div>
+      <h1>LinkedIn AI Premium</h1>
+      <p>AI-powered chat assistant for LinkedIn profiles</p>
+    </header>
+
+    <main>
+      <section class="settings-section">
+        <h2>API Configuration</h2>
+        <div class="setting-item">
+          <label for="api-key">Gemini API Key</label>
+          <div class="input-group">
+            <input type="password" id="api-key" placeholder="Enter your Gemini API key">
+            <button id="toggle-visibility" class="icon-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="currentColor"/>
+              </svg>
+            </button>
+          </div>
+          <div class="setting-description">
+            Get your free API key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>
+          </div>
+        </div>
+        <div class="setting-actions">
+          <button id="save-key" class="btn-primary">Save API Key</button>
+          <button id="test-key" class="btn-secondary">Test Connection</button>
+        </div>
+        <div id="status-message" class="status-message"></div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Your Profile</h2>
+        <div class="setting-item">
+          <label for="linkedin-url">Your LinkedIn Profile URL</label>
+          <div class="input-group">
+            <input type="text" id="linkedin-url" placeholder="https://www.linkedin.com/in/your-profile">
+          </div>
+          <div class="setting-description">
+            Paste your LinkedIn profile URL so the AI can personalize messages with your information. Navigate to your LinkedIn profile after saving to capture your data.
+          </div>
+        </div>
+        <div class="setting-actions">
+          <button id="save-profile-url" class="btn-primary">Save Profile URL</button>
+          <button id="capture-now" class="btn-secondary">Capture Profile Now</button>
+        </div>
+        <div id="profile-status" class="status-message"></div>
+        <div id="profile-preview" class="profile-preview" style="display: none;">
+          <h3>Profile Preview</h3>
+          <div class="profile-preview-content">
+            <img id="preview-photo" src="" alt="Profile" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;">
+            <div>
+              <p><strong id="preview-name"></strong></p>
+              <p id="preview-headline" style="color: #666;"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Chat History</h2>
+        <div class="setting-item">
+          <div class="setting-description">
+            Manage your chat history and stored conversations
+          </div>
+        </div>
+        <div class="setting-actions">
+          <button id="export-history" class="btn-secondary">Export History</button>
+          <button id="clear-history" class="btn-danger">Clear All History</button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>About</h2>
+        <div class="about-info">
+          <p><strong>Version:</strong> 1.0.0</p>
+          <p><strong>Model:</strong> Gemini 2.0 Flash</p>
+          <p>
+            <a href="https://www.linkedin.com/help/linkedin/answer/a1655947" target="_blank">Learn more about AI Premium</a>
+          </p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>
+

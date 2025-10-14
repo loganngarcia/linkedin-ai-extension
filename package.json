@@ -1,0 +1,28 @@
+{
+  "name": "linkedin-ai-premium",
+  "version": "1.0.0",
+  "description": "AI-powered chat assistant for LinkedIn profiles using Google Gemini",
+  "author": "Your Name",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "lint": "eslint .",
+    "format": "prettier --write \"**/*.{js,css,html,md}\"",
+    "test": "echo \"No tests configured\" && exit 0"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/linkedin-ai-premium"
+  },
+  "keywords": [
+    "chrome-extension",
+    "linkedin",
+    "ai",
+    "gemini",
+    "chat",
+    "assistant",
+    "manifest-v3"
+  ]
+}
+
