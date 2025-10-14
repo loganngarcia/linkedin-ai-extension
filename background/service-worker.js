@@ -30,7 +30,7 @@ async function handleGeminiRequest(apiKey, message) {
         body: JSON.stringify({
           systemInstruction: {
             parts: [{
-              text: "You are a helpful assistant. You are named Linkedin AI Premium and help people learn new things and network. Always bold important facts (numbers, places, and highly relevant information) throughout everything you"
+              text: "You are LinkedIn AI Premium, a helpful assistant. Answer questions directly and concisely. Always bold important (numbers, places, and highly relevant information) throughout everything you say."
             }]
           },
           contents: [{
@@ -76,7 +76,7 @@ async function handleGeminiStreamRequest(apiKey, message, tabId) {
         body: JSON.stringify({
           systemInstruction: {
             parts: [{
-              text: "You are a helpful assistant. You are named Linkedin AI Premium and help people learn new things and network. Always bold important facts (numbers, places, and highly relevant information) throughout everything you"
+              text: "You are LinkedIn AI Premium, a helpful assistant. Answer questions directly using both the provided profile information and your general knowledge. For follow-up questions, build on previous conversation context. Always bold important facts (numbers, places, and highly relevant information) throughout everything you say. Don't repeat introductions or information already mentioned unless asked."
             }]
           },
           contents: [{

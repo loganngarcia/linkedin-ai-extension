@@ -1,27 +1,30 @@
-// LinkedIn Profile Scraper
-// Captures full DOM of LinkedIn profile pages
+// LinkedIn Profile & Company Scraper
+// Captures full DOM of LinkedIn profile and company pages
 
 class LinkedInScraper {
   static async scrapeProfile() {
+    const isCompanyPage = window.location.href.includes('/company/');
+    
     const profile = {
       name: '',
       url: window.location.href,
       scrapedAt: new Date().toISOString(),
-      dom: ''
+      dom: '',
+      type: isCompanyPage ? 'company' : 'profile'
     };
 
     try {
-      // Wait for profile to load
+      // Wait for profile/company to load
       await this.waitForElement('h1');
 
       // Extract just the name for display purposes
-      profile.name = this.extractName();
+      profile.name = isCompanyPage ? this.extractCompanyName() : this.extractName();
 
-      // Capture the full profile DOM
+      // Capture the full profile/company DOM
       profile.dom = this.captureProfileDOM();
 
     } catch (error) {
-      console.error('Error scraping LinkedIn profile:', error);
+      console.error('Error scraping LinkedIn profile/company:', error);
     }
 
     return profile;
@@ -57,6 +60,25 @@ class LinkedInScraper {
       'h1.inline.t-24.v-align-middle.break-words',
       'h1.top-card-layout__title',
       '.pv-top-card--list li:first-child'
+    ];
+
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        return element.textContent.trim();
+      }
+    }
+
+    return '';
+  }
+
+  static extractCompanyName() {
+    const selectors = [
+      'h1.org-top-card-summary__title',
+      'h1.text-heading-xlarge',
+      'h1.inline.t-24.v-align-middle.break-words',
+      '.org-top-card-summary__title',
+      '.top-card-layout__title'
     ];
 
     for (const selector of selectors) {

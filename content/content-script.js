@@ -186,6 +186,9 @@ class LinkedInAI {
   findProfileActionsContainer() {
     console.log('LinkedIn AI: Searching for action buttons container...');
     
+    // Check if this is a company page
+    const isCompanyPage = window.location.href.includes('/company/');
+    
     // Strategy 1: Find a container that has 2-5 buttons (typical action button group)
     // BUT EXCLUDE sticky header containers
     const allDivs = document.querySelectorAll('div');
@@ -201,19 +204,31 @@ class LinkedInAI {
       // Count direct button children
       const buttons = Array.from(div.children).filter(child => child.tagName === 'BUTTON');
       
-      // LinkedIn profile actions typically have 2-5 buttons in a row
+      // LinkedIn profile/company actions typically have 2-5 buttons in a row
       if (buttons.length >= 2 && buttons.length <= 5) {
         // Check if any button has a common action keyword
         const hasActionButton = buttons.some(btn => {
           const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
           const text = btn.textContent.trim().toLowerCase();
-          return ariaLabel.includes('message') || 
-                 ariaLabel.includes('connect') || 
-                 ariaLabel.includes('follow') ||
-                 ariaLabel.includes('more') ||
-                 text.includes('message') ||
-                 text.includes('follow') ||
-                 text.includes('more');
+          
+          if (isCompanyPage) {
+            // Company page specific keywords
+            return ariaLabel.includes('follow') || 
+                   ariaLabel.includes('visit website') ||
+                   ariaLabel.includes('more') ||
+                   text.includes('follow') ||
+                   text.includes('visit website') ||
+                   text.includes('more');
+          } else {
+            // Profile page keywords
+            return ariaLabel.includes('message') || 
+                   ariaLabel.includes('connect') || 
+                   ariaLabel.includes('follow') ||
+                   ariaLabel.includes('more') ||
+                   text.includes('message') ||
+                   text.includes('follow') ||
+                   text.includes('more');
+          }
         });
         
         if (hasActionButton) {
@@ -226,7 +241,9 @@ class LinkedInAI {
     }
     
     // Strategy 2: Find any button with common LinkedIn action keywords (skip sticky headers)
-    const actionKeywords = ['message', 'connect', 'follow', 'more', 'view my'];
+    const actionKeywords = isCompanyPage 
+      ? ['follow', 'visit website', 'more'] 
+      : ['message', 'connect', 'follow', 'more', 'view my'];
     const allButtons = document.querySelectorAll('button');
     
     for (const button of allButtons) {
@@ -464,46 +481,7 @@ class LinkedInAI {
         <div class="chat-viewport" id="chat-content" role="log" aria-live="polite" aria-label="Chat messages">
           <div class="chat-messages" id="chat-messages"></div>
           <div data-layer="auto layout" class="quick-actions-container" id="quick-actions">
-            <div data-layer="summarize" class="quick-action" 
-                 data-action="Summarize" 
-                 data-backend-action="Write a human summary like you're telling your mom about this person (but don't actually say that). Focus on who they are as a person, what they're passionate about, and how to start a conversation with them. Focus on what makes them relatable.
-
-Include: where they live/work, where/what they did for work/school, what they're into (hobbies, interests), their personality vibe, and relevant, non-weird conversation starters. Use normal words people actually say. Still be polite and friendly.
-
-ONLY OUTPUT THIS EXACT FORMAT AND NOTHING ELSE:
-Clean, simple sentence about who they are as a person
-
-• [Emoji] [1-5 human, short & succinct, conversational points about their personality, interests, and sometimes how to connect with them]"
-
-                 role="button" tabindex="0" aria-label="Summarize">
-              <div data-layer="Summarize">Summarize</div>
-            </div>
-            <div data-layer="draft messages" class="quick-action" 
-                 data-action="Draft messages" 
-                 data-backend-action="Output ONLY message drafts, nothing else. Rules:
-
-- Always start with 'Hi'
-- Absolutely max 300 characters
-- Sentence 1: Something specific about their exact role/team or congrats based on their profile. If they started as an intern → mention it. If they just got promoted → say congrats.
-- Sentence 2: Always mention the SPECIFIC role I just applied for (include exact job title AND company name)
-- Sentence 3: ABSOLUTELY ONLY if they are a recruiter or hiring manager, briefly mention my relevant background and role number in parenthesis after job title I applied for.
-- Final sentence: Always end with a polite request for a brief call ('to hear about your experience and your team's focus' / 'to learn more about the team's priorities').
-- Tone: warm, professional, not forced. Avoid sounding robotic.
-- ABSOLUTELY avoid words like: stood out, inspiring, impressive, unique, bridging, advancing, journey, takeaways, and other buzzwords that feel fake/cringe/impersonal/robotic. Use mom-talk, what matters to customers, no consultant-ese.
-- IMPORTANT: Only reference their posts/comments if they're substantial (career moves, insights, achievements). Never reference trivial comments like 'congrats' on random posts - that's spammy and irrelevant.
-- NEVER mention LinkedIn Premium, badges, or other LinkedIn features - that's weird and awkward.
-- Be specific about job titles and companies - never say vague things like 'the role' without context.
-
-Generate 3 variations personalized based on the person's role and posts."
-                 role="button" tabindex="0" aria-label="Draft messages">
-              <div data-layer="Draft messages">Draft messages</div>
-            </div>
-            <div data-layer="improve my profile (to better sell myself to this person)" class="quick-action" 
-                 data-action="Improve my profile" 
-                 data-backend-action="Look at my profile and this person's profile and suggest 3-5 ways I could make my profile more authentic and human. Focus on showing my personality, interests, and what I'm passionate about - not just my job title. Help me come across as someone people would want to have a conversation with, not just work with."
-                 role="button" tabindex="0" aria-label="Improve my profile">
-              <div data-layer="Improve my profile">Improve my profile</div>
-            </div>
+            <!-- Quick actions will be populated by resetQuickActionsToDefault() -->
           </div>
         </div>
       </div>
@@ -521,6 +499,9 @@ Generate 3 variations personalized based on the person's role and posts."
     document.body.appendChild(chatContainer);
     this.attachChatEventListeners();
     this.loadChatHistory();
+    
+    // Initialize quick actions based on current profile type
+    this.resetQuickActionsToDefault();
   }
 
   attachChatEventListeners() {
@@ -1189,11 +1170,57 @@ Example format: ["Tell me more", "What about skills?", "Draft a message"]`;
     const quickActionsContainer = document.getElementById('quick-actions');
     if (!quickActionsContainer) return;
 
-    // Reset to default quick actions
-    quickActionsContainer.innerHTML = `
-      <div data-layer="summarize" class="quick-action" 
-           data-action="Summarize" 
-           data-backend-action="Write a human summary like you're telling your mom about this person (but don't actually say that). Focus on who they are as a person, what they're passionate about, and how to start a conversation with them. Focus on what makes them relatable.
+    // Check if this is a company page
+    const isCompanyPage = this.currentProfile && this.currentProfile.type === 'company';
+
+    // Reset to context-appropriate quick actions
+    if (isCompanyPage) {
+      // Company page quick actions
+      quickActionsContainer.innerHTML = `
+        <div data-layer="summarize" class="quick-action" 
+             data-action="Summarize" 
+             data-backend-action="Write a human summary like you're telling your mom about this company (but don't actually say that). Focus on what the company does, their industry, size, culture, notable achievements, and how to approach them professionally. Use normal words people actually say. Still be polite and friendly.
+
+ONLY OUTPUT THIS EXACT FORMAT AND NOTHING ELSE:
+Clean, simple sentence about what this company is
+
+• [Emoji] [1-5 human, short & succinct, conversational points about their industry, culture, achievements, and how to connect with them]"
+             role="button" tabindex="0" aria-label="Summarize">
+          <div data-layer="Summarize">Summarize</div>
+        </div>
+        <div data-layer="use cases" class="quick-action" 
+             data-action="Use cases" 
+             data-backend-action="Based on this company's profile, list 1-5 specific use cases for their products/services. Focus on practical scenarios where someone would actually use what they offer. Be specific and actionable.
+
+ONLY OUTPUT THIS EXACT FORMAT AND NOTHING ELSE:
+Clean, simple sentence about who uses this company
+
+• [Emoji] [1-5 human, short & succinct, conversational points about specific use cases and scenarios]"
+             role="button" tabindex="0" aria-label="Use cases">
+          <div data-layer="Use cases">Use cases</div>
+        </div>
+        <div data-layer="improve my profile (to better sell myself to this company)" class="quick-action" 
+             data-action="Improve my profile" 
+             data-backend-action="Look at my profile and this company's profile and suggest 3-5 ways I could make my profile more attractive to this company. Focus on aligning my skills, experience, and interests with their culture and values. Help me come across as someone they'd want to hire or work with.
+
+ONLY OUTPUT THIS EXACT FORMAT AND NOTHING ELSE:
+Clean, simple sentence about how to improve my profile for this company
+
+• [Direct, actionable improvement suggestion]
+• [Direct, actionable improvement suggestion]
+• [Direct, actionable improvement suggestion]
+• [Direct, actionable improvement suggestion]
+• [Direct, actionable improvement suggestion]"
+             role="button" tabindex="0" aria-label="Improve my profile">
+          <div data-layer="Improve my profile">Improve my profile</div>
+        </div>
+      `;
+    } else {
+      // Profile page quick actions
+      quickActionsContainer.innerHTML = `
+        <div data-layer="summarize" class="quick-action" 
+             data-action="Summarize" 
+             data-backend-action="Write a human summary like you're telling your mom about this person (but don't actually say that). Focus on who they are as a person, what they're passionate about, and how to start a conversation with them. Focus on what makes them relatable.
 
 Include: where they live/work, where/what they did for work/school, what they're into (hobbies, interests), their personality vibe, and relevant, non-weird conversation starters. Use normal words people actually say. Still be polite and friendly.
 
@@ -1201,12 +1228,12 @@ ONLY OUTPUT THIS EXACT FORMAT AND NOTHING ELSE:
 Clean, simple sentence about who they are as a person
 
 • [Emoji] [1-5 human, short & succinct, conversational points about their personality, interests, and sometimes how to connect with them]"
-           role="button" tabindex="0" aria-label="Summarize">
-        <div data-layer="Summarize">Summarize</div>
-      </div>
-      <div data-layer="draft messages" class="quick-action" 
-           data-action="Draft messages" 
-           data-backend-action="Output ONLY message drafts, nothing else. Rules:
+             role="button" tabindex="0" aria-label="Summarize">
+          <div data-layer="Summarize">Summarize</div>
+        </div>
+        <div data-layer="draft messages" class="quick-action" 
+             data-action="Draft messages" 
+             data-backend-action="Output ONLY message drafts, nothing else. Rules:
 
 - Always start with 'Hi'
 - Absolutely max 300 characters
@@ -1221,16 +1248,26 @@ Clean, simple sentence about who they are as a person
 - Be specific about job titles and companies - never say vague things like 'the role' without context.
 
 Generate 3 variations personalized based on the person's role and posts."
-           role="button" tabindex="0" aria-label="Draft messages">
-        <div data-layer="Draft messages">Draft messages</div>
-      </div>
-      <div data-layer="improve my profile (to better sell myself to this person)" class="quick-action" 
-           data-action="Improve my profile" 
-           data-backend-action="Look at my profile and this person's profile and suggest 3-5 ways I could make my profile more authentic and human. Focus on showing my personality, interests, and what I'm passionate about - not just my job title. Help me come across as someone people would want to have a conversation with, not just work with."
-           role="button" tabindex="0" aria-label="Improve my profile">
-        <div data-layer="Improve my profile">Improve my profile</div>
-      </div>
-    `;
+             role="button" tabindex="0" aria-label="Draft messages">
+          <div data-layer="Draft messages">Draft messages</div>
+        </div>
+        <div data-layer="improve my profile (to better sell myself to this person)" class="quick-action" 
+             data-action="Improve my profile" 
+             data-backend-action="Look at my profile and this person's profile and suggest 3-5 ways I could make my profile more authentic and human. Focus on showing my personality, interests, and what I'm passionate about - not just my job title. Help me come across as someone people would want to have a conversation with, not just work with.
+
+ONLY OUTPUT THIS EXACT FORMAT AND NOTHING ELSE:
+Clean, simple sentence about how to improve my profile for this person
+
+• [Direct, actionable improvement suggestion]
+• [Direct, actionable improvement suggestion]
+• [Direct, actionable improvement suggestion]
+• [Direct, actionable improvement suggestion]
+• [Direct, actionable improvement suggestion]"
+             role="button" tabindex="0" aria-label="Improve my profile">
+          <div data-layer="Improve my profile">Improve my profile</div>
+        </div>
+      `;
+    }
   }
 
   finalizeStreamingMessage(content) {
@@ -1491,7 +1528,26 @@ ${profile.dom}`;
     // Get user's own profile data for context
     const { user_profile } = await chrome.storage.sync.get(['user_profile']);
     
+    // Get conversation history for this profile
+    const profileHash = this.hashProfile(window.location.href);
+    const result = await chrome.storage.local.get(['chats']);
+    const chats = result.chats || {};
+    const chatHistory = chats[profileHash]?.messages || [];
+    
     let contextMessage = '';
+    
+    // Add conversation history if this is a follow-up question
+    if (chatHistory.length > 0) {
+      contextMessage += `=== CONVERSATION HISTORY ===\n`;
+      // Include last 20 messages (10 exchanges) - Gemini 2.5 Flash has 1M token context window
+      // This provides much better context while staying well within limits
+      const recentMessages = chatHistory.slice(-20);
+      recentMessages.forEach(msg => {
+        const role = msg.role === 'user' ? 'User' : 'Assistant';
+        contextMessage += `${role}: ${msg.content}\n`;
+      });
+      contextMessage += `\n`;
+    }
     
     // Add user profile context if available (DOM or parsed data)
     if (user_profile) {
@@ -1509,12 +1565,13 @@ ${profile.dom}`;
       }
     }
     
-    // Add the profile being viewed
+    // Add the profile/company being viewed
     if (!this.currentProfile) {
       return contextMessage + userMessage;
     }
 
-    contextMessage += `=== PROFILE BEING VIEWED ===\n`;
+    const pageType = this.currentProfile.type === 'company' ? 'COMPANY BEING VIEWED' : 'PROFILE BEING VIEWED';
+    contextMessage += `=== ${pageType} ===\n`;
     
     // Use AI-generated summary if available, otherwise use DOM
     if (this.currentProfile.aiSummary) {
@@ -1526,8 +1583,14 @@ ${profile.dom}`;
       contextMessage += `Name: ${this.currentProfile.name}\n`;
     }
 
-    contextMessage += `\n=== USER QUESTION ===\n${userMessage}\n\n`;
-    contextMessage += `Provide a helpful, professional response. Use the information about the user asking (your profile) to give personalized advice and context-aware suggestions.`;
+    contextMessage += `\n=== CURRENT USER QUESTION ===\n${userMessage}\n\n`;
+    
+    // Adjust instruction based on whether this is a follow-up
+    if (chatHistory.length > 0) {
+      contextMessage += `This is a follow-up question. Use the conversation history above to understand the context. Answer directly and build on previous information. Use your general knowledge when helpful (e.g., for questions about locations, companies, universities). Don't repeat information already mentioned unless specifically asked.`;
+    } else {
+      contextMessage += `Answer the user's question directly and helpfully. Use your general knowledge when helpful.`;
+    }
 
     return contextMessage;
   }
@@ -1695,10 +1758,10 @@ ${profile.dom}`;
     const observer = new MutationObserver(() => {
       const currentUrl = window.location.href;
       
-      // Profile navigation detected
-      if (currentUrl !== lastUrl && currentUrl.includes('/in/')) {
+      // Profile/Company navigation detected
+      if (currentUrl !== lastUrl && (currentUrl.includes('/in/') || currentUrl.includes('/company/'))) {
         lastUrl = currentUrl;
-        console.log('LinkedIn AI: Profile navigation detected:', currentUrl);
+        console.log('LinkedIn AI: Profile/Company navigation detected:', currentUrl);
         
         // Remove old button
         const oldButton = document.getElementById('linkedin-ai-button');
@@ -1716,7 +1779,8 @@ ${profile.dom}`;
             this.currentProfile = profile;
             const notification = document.createElement('div');
             notification.className = 'profile-switch-notification';
-            notification.textContent = `Switched to ${profile.name}'s profile`;
+            const pageType = currentUrl.includes('/company/') ? 'company' : 'profile';
+            notification.textContent = `Switched to ${profile.name}'s ${pageType}`;
             const chatEl = document.getElementById('linkedin-ai-chat');
             if (chatEl) {
               chatEl.appendChild(notification);
@@ -1729,7 +1793,7 @@ ${profile.dom}`;
       // Re-inject button if it disappears (LinkedIn removes it)
       // Only check every 10 mutations to reduce overhead
       checkCount++;
-      if (checkCount % 10 === 0 && window.location.href.includes('/in/')) {
+      if (checkCount % 10 === 0 && (window.location.href.includes('/in/') || window.location.href.includes('/company/'))) {
         const button = document.getElementById('linkedin-ai-button');
         if (!button || !button.isConnected) {
           console.log('LinkedIn AI: Button was removed by LinkedIn, re-injecting...');
