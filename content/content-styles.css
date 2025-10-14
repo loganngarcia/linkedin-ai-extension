@@ -73,18 +73,12 @@ button#linkedin-ai-button.linkedin-ai-button:active {
   z-index: 999999;
   display: flex;
   align-items: flex-end;
-  animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: height 0.25s ease;
 }
 
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.linkedin-ai-chat-container.collapsed {
+  height: 48px;
+  align-items: flex-end;
 }
 
 .linkedin-ai-chat-panel {
@@ -109,11 +103,13 @@ button#linkedin-ai-button.linkedin-ai-button:active {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   box-sizing: border-box;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+  transition: height 0.25s ease, padding 0.25s ease;
 }
 
 .linkedin-ai-chat-panel.collapsed {
-  height: 360px;
-  padding-bottom: 6rem;
+  height: 48px;
+  padding: 0;
+  overflow: hidden;
 }
 
 .linkedin-ai-chat-panel svg {
@@ -161,6 +157,24 @@ button#linkedin-ai-button.linkedin-ai-button:active {
   box-sizing: border-box;
   z-index: 3;
   box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.chat-navbar:hover {
+  background: #1B2023;
+}
+
+.chat-navbar:hover::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  transition: opacity 150ms ease;
 }
 
 .navbar-profile-icon {
@@ -529,6 +543,18 @@ button#linkedin-ai-button.linkedin-ai-button:active {
 .linkedin-ai-chat-panel.collapsed .chat-caption {
   opacity: 0.7;
 }
+
+/* Collapsed navbar state - moves to bottom */
+.linkedin-ai-chat-panel.collapsed .chat-navbar {
+  position: absolute;
+  top: 0;
+  bottom: auto;
+  left: 0;
+  width: 100%;
+  border-radius: 8px 8px 0 0;
+  transition: transform 0.25s ease;
+}
+
 .api-key-dropdown {
   position: absolute;
   top: 60px;

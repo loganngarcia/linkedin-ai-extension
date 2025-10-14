@@ -382,6 +382,25 @@ class LinkedInAI {
         chatContainer.remove();
       }
       this.chatOpen = false;
+      this.chatCollapsed = false;
+    }
+  }
+
+  toggleChatCollapse() {
+    const chatPanel = document.querySelector('.linkedin-ai-chat-panel');
+    const chatContainer = document.querySelector('.linkedin-ai-chat-container');
+    if (!chatPanel || !chatContainer) return;
+
+    this.chatCollapsed = !this.chatCollapsed;
+    
+    if (this.chatCollapsed) {
+      // Add collapsed class - CSS transitions handle the animation
+      chatPanel.classList.add('collapsed');
+      chatContainer.classList.add('collapsed');
+    } else {
+      // Remove collapsed state - CSS transitions handle the animation
+      chatPanel.classList.remove('collapsed');
+      chatContainer.classList.remove('collapsed');
     }
   }
 
@@ -447,21 +466,35 @@ class LinkedInAI {
           <div data-layer="auto layout" class="quick-actions-container" id="quick-actions">
             <div data-layer="summarize" class="quick-action" 
                  data-action="Summarize" 
-                 data-backend-action="Write a human summary like you're telling your mom about this person. Focus on who they are as a person, what they're passionate about, and how to start a conversation with them. Focus on work, schools, personality, interests, and what makes them relatable.
+                 data-backend-action="Write a human summary like you're telling your mom about this person (but don't actually say that). Focus on who they are as a person, what they're passionate about, and how to start a conversation with them. Focus on what makes them relatable.
 
-Include: where they live/work, what they're into (hobbies, interests), their personality vibe, and conversation starters. Use normal words people actually say.
+Include: where they live/work, where/what they did for work/school, what they're into (hobbies, interests), their personality vibe, and relevant, non-weird conversation starters. Use normal words people actually say. Still be polite and friendly.
 
-Format:
-[One sentence about who they are as a person]
+ONLY OUTPUT THIS EXACT FORMAT AND NOTHING ELSE:
+Clean, simple sentence about who they are as a person
 
-• [Emoji] [3-7 human, conversational points about their personality, interests, and how to connect with them]"
+• [Emoji] [1-5 human, short & succinct, conversational points about their personality, interests, and sometimes how to connect with them]"
 
                  role="button" tabindex="0" aria-label="Summarize">
               <div data-layer="Summarize">Summarize</div>
             </div>
             <div data-layer="draft messages" class="quick-action" 
                  data-action="Draft messages" 
-                 data-backend-action="Draft 2-3 natural, human messages I could send to connect with this person. Focus on genuine conversation starters based on shared interests, experiences, or just being friendly. Keep it casual and authentic - like how you'd actually talk to someone you want to get to know. Avoid sales-y language or trying to impress them."
+                 data-backend-action="Output ONLY message drafts, nothing else. Rules:
+
+- Always start with 'Hi'
+- Absolutely max 300 characters
+- Sentence 1: Something specific about their exact role/team or congrats based on their profile. If they started as an intern → mention it. If they just got promoted → say congrats.
+- Sentence 2: Always mention the SPECIFIC role I just applied for (include exact job title AND company name)
+- Sentence 3: ABSOLUTELY ONLY if they are a recruiter or hiring manager, briefly mention my relevant background and role number in parenthesis after job title I applied for.
+- Final sentence: Always end with a polite request for a brief call ('to hear about your experience and your team's focus' / 'to learn more about the team's priorities').
+- Tone: warm, professional, not forced. Avoid sounding robotic.
+- ABSOLUTELY avoid words like: stood out, inspiring, impressive, unique, bridging, advancing, journey, takeaways, and other buzzwords that feel fake/cringe/impersonal/robotic. Use mom-talk, what matters to customers, no consultant-ese.
+- IMPORTANT: Only reference their posts/comments if they're substantial (career moves, insights, achievements). Never reference trivial comments like 'congrats' on random posts - that's spammy and irrelevant.
+- NEVER mention LinkedIn Premium, badges, or other LinkedIn features - that's weird and awkward.
+- Be specific about job titles and companies - never say vague things like 'the role' without context.
+
+Generate 3 variations personalized based on the person's role and posts."
                  role="button" tabindex="0" aria-label="Draft messages">
               <div data-layer="Draft messages">Draft messages</div>
             </div>
@@ -494,6 +527,7 @@ Format:
     const menuBtn = document.getElementById('chat-menu-btn');
     const newChatBtn = document.getElementById('new-chat-btn');
     const closeBtn = document.getElementById('chat-close-btn');
+    const navbar = document.querySelector('.chat-navbar');
 
     const toggleDropdown = async () => {
       const dropdown = document.getElementById('api-key-dropdown');
@@ -515,15 +549,29 @@ Format:
       }
     };
 
-    const handleNewChat = () => {
-      // Clear chat messages
+    const handleNewChat = async () => {
+      // Clear chat messages from UI
       const messagesContainer = document.getElementById('chat-messages');
       if (messagesContainer) {
         messagesContainer.innerHTML = '';
       }
-      // Reset message count
+      
+      // Reset message count and streaming state
       this.messageCount = 0;
       this.streamingMessageId = null;
+      
+      // Clear chat history from storage for current profile
+      const profileHash = this.hashProfile(window.location.href);
+      await chrome.storage.local.get(['chats']).then(result => {
+        const chats = result.chats || {};
+        if (chats[profileHash]) {
+          delete chats[profileHash];
+          chrome.storage.local.set({ chats });
+        }
+      });
+      
+      // Reset AI suggestions to default quick actions
+      this.resetQuickActionsToDefault();
     };
 
     const attachButtonHandlers = (element, handler) => {
@@ -540,6 +588,17 @@ Format:
     attachButtonHandlers(menuBtn, toggleDropdown);
     attachButtonHandlers(newChatBtn, handleNewChat);
     attachButtonHandlers(closeBtn, () => this.toggleChat());
+    
+    // Navbar click handler for collapse/expand
+    if (navbar) {
+      navbar.addEventListener('click', (e) => {
+        // Don't collapse if clicking on action buttons
+        if (e.target.closest('.navbar-actions')) {
+          return;
+        }
+        this.toggleChatCollapse();
+      });
+    }
 
     // API key actions
     document.getElementById('save-api-key')?.addEventListener('click', async () => {
@@ -702,8 +761,8 @@ Format:
       sendBtn.disabled = true;
     }
     
-    // Send backend text to AI
-    this.getAIResponse(backendText);
+    // Send backend text to AI but pass displayText for storage
+    this.getAIResponse(backendText, displayText);
   }
 
   async sendMessage() {
@@ -967,7 +1026,7 @@ Format:
     }
   }
 
-  async getAIResponse(userMessage, retryCount = 0) {
+  async getAIResponse(userMessage, displayTextForStorage = null, retryCount = 0) {
     const MAX_RETRIES = 2;
     
     // Show thinking indicator
@@ -1038,8 +1097,8 @@ Format:
           // Streaming complete - add action buttons to the message
           this.finalizeStreamingMessage(response.text);
           
-          // Save message to storage
-          this.saveMessageToStorage(userMessage, response.text);
+          // Save message to storage (use displayTextForStorage if provided, otherwise userMessage)
+          this.saveMessageToStorage(displayTextForStorage || userMessage, response.text);
         } else {
           this.addMessage('assistant', '⚠️ Received empty response. Please try again.');
         }
@@ -1070,7 +1129,7 @@ Example format: ["Tell me more", "What about skills?", "Draft a message"]`;
 
       // Call Gemini API directly for suggestions (non-streaming, quick response)
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gemini_api_key}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-09-2025:generateContent?key=${gemini_api_key}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1124,6 +1183,54 @@ Example format: ["Tell me more", "What about skills?", "Draft a message"]`;
 
       quickActionsContainer.appendChild(actionDiv);
     });
+  }
+
+  resetQuickActionsToDefault() {
+    const quickActionsContainer = document.getElementById('quick-actions');
+    if (!quickActionsContainer) return;
+
+    // Reset to default quick actions
+    quickActionsContainer.innerHTML = `
+      <div data-layer="summarize" class="quick-action" 
+           data-action="Summarize" 
+           data-backend-action="Write a human summary like you're telling your mom about this person (but don't actually say that). Focus on who they are as a person, what they're passionate about, and how to start a conversation with them. Focus on what makes them relatable.
+
+Include: where they live/work, where/what they did for work/school, what they're into (hobbies, interests), their personality vibe, and relevant, non-weird conversation starters. Use normal words people actually say. Still be polite and friendly.
+
+ONLY OUTPUT THIS EXACT FORMAT AND NOTHING ELSE:
+Clean, simple sentence about who they are as a person
+
+• [Emoji] [1-5 human, short & succinct, conversational points about their personality, interests, and sometimes how to connect with them]"
+           role="button" tabindex="0" aria-label="Summarize">
+        <div data-layer="Summarize">Summarize</div>
+      </div>
+      <div data-layer="draft messages" class="quick-action" 
+           data-action="Draft messages" 
+           data-backend-action="Output ONLY message drafts, nothing else. Rules:
+
+- Always start with 'Hi'
+- Absolutely max 300 characters
+- Sentence 1: Something specific about their exact role/team or congrats based on their profile. If they started as an intern → mention it. If they just got promoted → say congrats.
+- Sentence 2: Always mention the SPECIFIC role I just applied for (include exact job title AND company name)
+- Sentence 3: ABSOLUTELY ONLY if they are a recruiter or hiring manager, briefly mention my relevant background and role number in parenthesis after job title I applied for.
+- Final sentence: Always end with a polite request for a brief call ('to hear about your experience and your team's focus' / 'to learn more about the team's priorities').
+- Tone: warm, professional, not forced. Avoid sounding robotic.
+- ABSOLUTELY avoid words like: stood out, inspiring, impressive, unique, bridging, advancing, journey, takeaways, and other buzzwords that feel fake/cringe/impersonal/robotic. Use mom-talk, what matters to customers, no consultant-ese.
+- IMPORTANT: Only reference their posts/comments if they're substantial (career moves, insights, achievements). Never reference trivial comments like 'congrats' on random posts - that's spammy and irrelevant.
+- NEVER mention LinkedIn Premium, badges, or other LinkedIn features - that's weird and awkward.
+- Be specific about job titles and companies - never say vague things like 'the role' without context.
+
+Generate 3 variations personalized based on the person's role and posts."
+           role="button" tabindex="0" aria-label="Draft messages">
+        <div data-layer="Draft messages">Draft messages</div>
+      </div>
+      <div data-layer="improve my profile (to better sell myself to this person)" class="quick-action" 
+           data-action="Improve my profile" 
+           data-backend-action="Look at my profile and this person's profile and suggest 3-5 ways I could make my profile more authentic and human. Focus on showing my personality, interests, and what I'm passionate about - not just my job title. Help me come across as someone people would want to have a conversation with, not just work with."
+           role="button" tabindex="0" aria-label="Improve my profile">
+        <div data-layer="Improve my profile">Improve my profile</div>
+      </div>
+    `;
   }
 
   finalizeStreamingMessage(content) {
@@ -1355,7 +1462,7 @@ Profile HTML:
 ${profile.dom}`;
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${gemini_api_key}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-09-2025:generateContent?key=${gemini_api_key}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

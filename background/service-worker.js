@@ -21,7 +21,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 async function handleGeminiRequest(apiKey, message) {
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-09-2025:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -67,7 +67,7 @@ async function handleGeminiRequest(apiKey, message) {
 async function handleGeminiStreamRequest(apiKey, message, tabId) {
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent?alt=sse&key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite-preview-09-2025:streamGenerateContent?alt=sse&key=${apiKey}`,
       {
         method: 'POST',
         headers: {
