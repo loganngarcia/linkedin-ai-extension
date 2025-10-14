@@ -1073,7 +1073,7 @@ Generate 3 variations personalized based on the person's role and posts."
         if (chrome.runtime.lastError) {
           console.error('Runtime error:', chrome.runtime.lastError);
           if (retryCount < MAX_RETRIES) {
-            setTimeout(() => this.getAIResponse(userMessage, retryCount + 1), 1000);
+            setTimeout(() => this.getAIResponse(userMessage, displayTextForStorage, retryCount + 1), 1000);
           } else {
             this.addMessage('assistant', '⚠️ Connection error. Please check your internet and try again.');
           }
@@ -1089,7 +1089,7 @@ Generate 3 variations personalized based on the person's role and posts."
           } else if (response.error.includes('quota') || response.error.includes('limit')) {
             this.addMessage('assistant', '⚠️ API quota exceeded. Please try again later or check your quota at aistudio.google.com');
           } else if (retryCount < MAX_RETRIES) {
-            setTimeout(() => this.getAIResponse(userMessage, retryCount + 1), 1000);
+            setTimeout(() => this.getAIResponse(userMessage, displayTextForStorage, retryCount + 1), 1000);
           } else {
             this.addMessage('assistant', '⚠️ Sorry, I encountered an error. Please try again later.');
           }
@@ -1108,7 +1108,7 @@ Generate 3 variations personalized based on the person's role and posts."
       document.getElementById('thinking-indicator')?.remove();
       
       if (retryCount < MAX_RETRIES) {
-        setTimeout(() => this.getAIResponse(userMessage, retryCount + 1), 1000);
+        setTimeout(() => this.getAIResponse(userMessage, displayTextForStorage, retryCount + 1), 1000);
       } else {
         this.addMessage('assistant', '⚠️ An unexpected error occurred. Please refresh and try again.');
       }

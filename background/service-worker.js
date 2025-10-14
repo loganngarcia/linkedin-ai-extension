@@ -30,7 +30,7 @@ async function handleGeminiRequest(apiKey, message) {
         body: JSON.stringify({
           systemInstruction: {
             parts: [{
-              text: "You are a helpful assistant. You are named Linkedin AI Premium and help people learn new things and network."
+              text: "You are a helpful assistant. You are named Linkedin AI Premium and help people learn new things and network. Always bold important facts (numbers, places, and highly relevant information) throughout everything you"
             }]
           },
           contents: [{
@@ -76,7 +76,7 @@ async function handleGeminiStreamRequest(apiKey, message, tabId) {
         body: JSON.stringify({
           systemInstruction: {
             parts: [{
-              text: "You are a helpful assistant. You are named Linkedin AI Premium and help people learn new things and network."
+              text: "You are a helpful assistant. You are named Linkedin AI Premium and help people learn new things and network. Always bold important facts (numbers, places, and highly relevant information) throughout everything you"
             }]
           },
           contents: [{
