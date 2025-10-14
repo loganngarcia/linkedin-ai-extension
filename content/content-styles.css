@@ -25,7 +25,7 @@ button#linkedin-ai-button {
   min-height: 32px !important;
   max-height: 32px !important;
   padding: 10px 16px !important;
-  margin: 0 4px !important;
+  margin: 0 8px 0 4px !important;
   gap: 4px !important;
   flex-shrink: 0 !important;
   border-radius: 50px !important;
@@ -34,7 +34,7 @@ button#linkedin-ai-button {
   outline-offset: -1px !important;
   background: transparent !important;
   background-color: transparent !important;
-  box-shadow: 0 2px 8px rgba(113, 183, 251, 0.3) !important;
+  box-shadow: none !important;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
   font-size: 15px !important;
   font-weight: 590 !important;
@@ -54,6 +54,7 @@ button#linkedin-ai-button.linkedin-ai-button:hover {
   border-color: #A5D4FE !important;
   outline-color: #A5D4FE !important;
   color: #A5D4FE !important;
+  box-shadow: inset 0 0 0 1px #A5D4FE !important;
 }
 
 button#linkedin-ai-button.linkedin-ai-button:active {
@@ -62,16 +63,16 @@ button#linkedin-ai-button.linkedin-ai-button:active {
   transform: scale(0.98) !important;
 }
 
-/* Chat Container - narrower, cleaner design */
 .linkedin-ai-chat-container {
   position: fixed;
   bottom: 0;
   left: 8px;
-  width: 384px;
+  width: 400px;
   height: 909px;
-  max-height: calc(100vh - 20px);
+  max-height: calc(100vh - 16px);
   z-index: 999999;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+  display: flex;
+  align-items: flex-end;
   animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -86,395 +87,510 @@ button#linkedin-ai-button.linkedin-ai-button:active {
   }
 }
 
-.linkedin-ai-chat {
-  width: 100%;
-  height: 100%;
-  background: #0C0A09;
-  border-radius: 8px 8px 0 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  display: flex;
+.linkedin-ai-chat-panel {
+  position: relative;
+  display: inline-flex;
   flex-direction: column;
-  overflow: hidden;
-}
-
-.linkedin-ai-chat.collapsed {
-  height: 400px;
-}
-
-/* Fixed Navbar at Top */
-.chat-navbar {
-  background: #292524;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.navbar-icon svg {
-  display: block;
-  width: 32px;
-  height: 32px;
-}
-
-.navbar-title {
-  flex: 1;
-  color: rgba(255, 255, 255, 0.95);
-  font-size: 14px;
-  font-weight: 400;
-  font-family: 'SF Pro', -apple-system, system-ui, sans-serif;
-}
-
-.navbar-controls {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-
-.navbar-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.65);
-  transition: color 150ms ease;
-  width: 32px;
-  height: 32px;
-}
-
-.navbar-btn:hover {
-  color: rgba(255, 255, 255, 0.95);
-}
-
-.navbar-btn svg {
-  width: 32px;
-  height: 32px;
-}
-
-/* Chat Content - Scrollable middle area */
-.chat-content {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-end;
   gap: 24px;
-}
-
-/* Message Bubbles */
-.chat-messages {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.message-bubble {
-  max-width: 320px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  color: rgba(255, 255, 255, 0.95);
-  font-size: 16px;
-  font-weight: 400;
-  font-family: 'Inter', -apple-system, system-ui, sans-serif;
-  line-height: 1.4;
-  word-wrap: break-word;
-  align-self: flex-end;
-}
-
-.ai-response {
+  width: 400px;
   max-width: 100%;
-  padding: 0;
-  background: transparent;
+  height: 100%;
+  max-height: 909px;
+  padding: 48px 12px 96px 12px;
+  background-color: #1B2023;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  outline: 1px solid rgba(255, 255, 255, 0.1);
+  outline-offset: -1px;
+  overflow: hidden;
   color: rgba(255, 255, 255, 0.95);
-  font-size: 16px;
-  font-weight: 400;
-  font-family: 'Inter', -apple-system, system-ui, sans-serif;
-  line-height: 1.5;
-  align-self: flex-start;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  box-sizing: border-box;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
 }
 
-/* Action icons for AI responses */
-.response-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 12px;
+.linkedin-ai-chat-panel.collapsed {
+  height: 360px;
+  padding-bottom: 6rem;
 }
 
-.action-icon {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  color: rgba(255, 255, 255, 0.45);
-  transition: color 150ms ease;
-  display: flex;
-  align-items: center;
+.linkedin-ai-chat-panel svg {
+  display: block;
 }
 
-.action-icon:hover {
-  color: rgba(255, 255, 255, 0.95);
-}
-
-/* Thinking indicator */
-.thinking-text {
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 16px;
-  font-weight: 400;
-  font-family: 'Inter', -apple-system, system-ui, sans-serif;
-  line-height: 1.5;
-}
-
-/* Typing Indicator */
-.typing-indicator {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  padding: 8px 0;
-}
-
-.typing-indicator span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.4);
-  animation: typing 1.4s infinite;
-}
-
-.typing-indicator span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.typing-indicator span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-@keyframes typing {
-  0%, 60%, 100% {
-    opacity: 0.3;
-    transform: translateY(0);
-  }
-  30% {
-    opacity: 1;
-    transform: translateY(-4px);
-  }
-}
-
-/* Fixed Input Container at Bottom */
-.chat-input-container {
-  flex-shrink: 0;
-  background: #0C0A09;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Quick Actions */
-.quick-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.quick-action-btn {
-  max-width: 384px;
-  padding: 12px;
-  border-radius: 20px;
-  border: 1px solid #60A5FA;
-  background: transparent;
-  color: #60A5FA;
-  font-size: 16px;
-  font-weight: 500;
-  font-family: 'Inter', -apple-system, system-ui, sans-serif;
-  cursor: pointer;
-  transition: all 150ms ease;
-  text-align: center;
-}
-
-.quick-action-btn:hover {
-  background: rgba(96, 165, 250, 0.1);
-}
-
-/* Input Box Wrapper */
-.input-box-wrapper {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
-  padding: 10px 10px 10px 16px;
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.input-field {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding-top: 6px;
-}
-
-.input-field textarea {
+.chat-caption {
   width: 100%;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: rgba(255, 255, 255, 0.95);
-  font-size: 16px;
-  font-weight: 400;
-  font-family: 'Inter', -apple-system, system-ui, sans-serif;
-  line-height: 1.5;
-  resize: none;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.input-field textarea::placeholder {
-  color: rgba(255, 255, 255, 0.4);
-}
-
-/* Mic Button */
-.mic-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
   display: flex;
-  align-items: center;
   justify-content: center;
-  width: 33px;
-  height: 36px;
-  flex-shrink: 0;
-  transition: opacity 150ms ease;
-}
-
-.mic-btn:hover {
-  opacity: 0.8;
-}
-
-/* Send Button Icon */
-.send-btn-icon {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  transition: opacity 150ms ease;
-}
-
-.send-btn-icon:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.send-btn-icon:not(:disabled):hover {
-  opacity: 0.9;
-}
-
-.send-btn-icon:disabled rect {
-  opacity: 0.5;
-}
-
-/* Caption at Bottom */
-.input-caption {
+  gap: 4px;
   text-align: center;
-  padding: 4px 0;
   font-size: 12px;
-  font-family: 'SF Pro', -apple-system, system-ui, sans-serif;
+  font-family: 'SF Pro', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.65);
+  flex-shrink: 0;
 }
 
 .caption-text {
-  color: rgba(255, 255, 255, 0.6);
-  font-weight: 400;
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .caption-link {
   color: #60A5FA;
   text-decoration: none;
-  font-weight: 400;
 }
 
 .caption-link:hover {
   text-decoration: underline;
 }
 
-/* API Key Dropdown */
+.chat-navbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: #1B2023;
+  box-sizing: border-box;
+  z-index: 3;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.navbar-profile-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.navbar-actions > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  transition: opacity 150ms ease;
+}
+
+.navbar-actions > div:hover {
+  opacity: 0.85;
+}
+
+.navbar-title-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.navbar-title {
+  width: 100%;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 14px;
+  font-weight: 590;
+  font-family: 'SF Pro', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-input-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 400px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 10px;
+  box-sizing: border-box;
+  z-index: 4;
+}
+
+.input-container {
+  width: 100%;
+  max-height: 384px;
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 10px 10px 16px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 28px;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+}
+
+.input-wrapper {
+  flex: 1;
+  align-self: stretch;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 18px;
+  padding-top: 6px;
+}
+
+.chat-input {
+  width: 100%;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 14px;
+  font-weight: 400;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  line-height: 21px;
+  resize: none;
+  min-height: 21px;
+  max-height: 200px;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+}
+
+.chat-input:focus {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+}
+
+/* Prevent autocomplete white background */
+.chat-input:-webkit-autofill,
+.chat-input:-webkit-autofill:hover,
+.chat-input:-webkit-autofill:focus,
+.chat-input:-webkit-autofill:active {
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.95) !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.chat-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.mic-button,
+.send-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.mic-button:hover,
+.send-button:not([disabled]):hover {
+  opacity: 0.85;
+}
+
+.send-button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.send-button[disabled] svg {
+  opacity: 0.6;
+}
+
+.chat-viewport {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  overflow-y: auto;
+  padding: 24px 4px 24px 0;
+  box-sizing: border-box;
+  z-index: 1;
+}
+
+.chat-viewport::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.chat-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.chat-messages {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.message-bubble {
+  max-width: 376px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  display: inline-flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 14px;
+  line-height: 21px;
+  align-self: flex-end;
+  word-break: break-word;
+}
+
+.user-message-text {
+  flex: 1;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.ai-response-block {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.ai-message-text {
+  width: 100%;
+  font-size: 14px !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  line-height: 21px;
+}
+
+.ai-message-quick-actions {
+  display: inline-flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.ai-message-quick-actions > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+.ai-message-quick-actions > div[role="button"] {
+  cursor: pointer;
+  transition: opacity 150ms ease;
+}
+
+.ai-message-quick-actions > div[role="button"]:hover {
+  opacity: 0.85;
+}
+
+.share-checkmark-icon,
+.tts-stop-icon {
+  display: none;
+}
+
+.thumbs-up-icon,
+.thumbs-down-icon,
+.share-icon,
+.tts-listen-icon {
+  display: flex;
+}
+
+.thinking-block {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.thinking-text {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 14px;
+  line-height: 21px;
+}
+
+.quick-actions-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.quick-action {
+  max-width: 380px;
+  display: inline-flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: 1px solid #69B1FD;
+  outline: 1px solid #69B1FD;
+  outline-offset: -1px;
+  color: #69B1FD;
+  cursor: pointer;
+  transition: all 150ms ease;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.quick-action:hover {
+  background: rgba(96, 165, 250, 0.08);
+}
+
+.quick-action:active {
+  background: rgba(96, 165, 250, 0.16);
+}
+
+.quick-action:focus-visible {
+  outline: 2px solid #2563EB;
+  outline-offset: 2px;
+}
+
+.quick-action div {
+  color: inherit;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 21px;
+}
+
+.size- {
+  display: contents;
+}
+
+.action-icon,
+.tts-listen-icon,
+.tts-stop-icon,
+.copy-success-icon {
+  align-items: center;
+  justify-content: center;
+  display: flex;
+}
+
+.linkedin-ai-chat-panel.collapsed .chat-viewport {
+  pointer-events: none;
+  filter: blur(1px);
+}
+
+.linkedin-ai-chat-panel.collapsed .quick-actions-container,
+.linkedin-ai-chat-panel.collapsed .chat-input-bar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.linkedin-ai-chat-panel.collapsed {
+  overflow: hidden;
+}
+
+.linkedin-ai-chat-panel.collapsed .chat-caption {
+  opacity: 0.7;
+}
 .api-key-dropdown {
   position: absolute;
-  top: 50px;
-  right: 10px;
-  background: #292524;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 16px;
-  width: 300px;
+  top: 60px;
+  right: 12px;
+  background: #201E1D;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  width: 18.75rem;
   z-index: 1000000;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
 }
 
 .dropdown-header {
   color: rgba(255, 255, 255, 0.95);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   margin-bottom: 12px;
 }
 
 .api-key-dropdown input {
   width: 100%;
-  padding: 10px;
-  background: #0C0A09;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  padding: 0.65rem 0.75rem;
+  background: rgba(12, 10, 9, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.5rem;
   color: rgba(255, 255, 255, 0.95);
-  font-size: 14px;
-  font-family: system-ui, -apple-system, sans-serif;
-  margin-bottom: 12px;
+  font-size: 0.875rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  margin-bottom: 0.75rem;
 }
 
 .dropdown-actions {
   display: flex;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .dropdown-btn {
   flex: 1;
-  padding: 8px 12px;
+  padding: 0.6rem 0.75rem;
   border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 590;
-  font-family: system-ui, -apple-system, sans-serif;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   cursor: pointer;
-  transition: all 150ms ease;
-  background: #71B7FB;
-  color: white;
+  transition: transform 120ms ease, background 120ms ease;
+  background: linear-gradient(135deg, rgba(113, 183, 251, 0.95), rgba(96, 165, 250, 0.95));
+  color: rgba(12, 10, 9, 0.95);
 }
 
 .dropdown-btn:hover {
-  background: #5BA3E8;
+  transform: translateY(-1px);
 }
 
 .dropdown-btn.secondary {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.95);
 }
 
 .dropdown-btn.secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 /* API Key Modal */
@@ -610,6 +726,7 @@ button#linkedin-ai-button.linkedin-ai-button:active {
 /* Markdown Content Styling */
 .markdown-content {
   line-height: 1.6;
+  font-size: 14px !important;
 }
 
 .markdown-content h1,
@@ -626,14 +743,16 @@ button#linkedin-ai-button.linkedin-ai-button:active {
 
 .markdown-content h1 { font-size: 24px; }
 .markdown-content h2 { font-size: 20px; }
-.markdown-content h3 { font-size: 18px; }
-.markdown-content h4 { font-size: 16px; }
+.markdown-content h3 { font-size: 16px; }
+.markdown-content h4 { font-size: 14px; }
 .markdown-content h5 { font-size: 14px; }
 .markdown-content h6 { font-size: 12px; }
 
 .markdown-content p {
   margin: 8px 0;
   color: rgba(255, 255, 255, 0.95);
+  font-size: 14px !important;
+  line-height: 21px;
 }
 
 .markdown-content strong {
@@ -680,8 +799,26 @@ button#linkedin-ai-button.linkedin-ai-button:active {
 }
 
 .markdown-content li {
-  margin: 4px 0;
-  line-height: 1.5;
+  margin: 0 0 1px 0;
+  line-height: 1.6;
+  font-size: 14px !important;
+}
+
+/* Nested list styling for sub-bullets */
+.markdown-content ul.nested {
+  margin: 0;
+  margin-top: 4px;
+  padding-left: 20px;
+}
+
+.markdown-content ul.nested li {
+  list-style-type: circle;
+}
+
+/* Remove any br tags inside lists for tight spacing */
+.markdown-content ul br,
+.markdown-content ol br {
+  display: none;
 }
 
 .markdown-content a {

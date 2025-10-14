@@ -9,6 +9,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => sendResponse({ error: error.message }));
     return true; // Keep message channel open for async response
   }
+  
+  if (request.type === 'GEMINI_STREAM_REQUEST') {
+    handleGeminiStreamRequest(request.apiKey, request.message, sender.tab.id)
+      .then(response => sendResponse(response))
+      .catch(error => sendResponse({ error: error.message }));
+    return true;
+  }
 });
 
 async function handleGeminiRequest(apiKey, message) {
@@ -21,6 +28,11 @@ async function handleGeminiRequest(apiKey, message) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          systemInstruction: {
+            parts: [{
+              text: "You are a helpful assistant. You are named Linkedin AI Premium and help people learn new things and network."
+            }]
+          },
           contents: [{
             parts: [{
               text: message
@@ -51,17 +63,22 @@ async function handleGeminiRequest(apiKey, message) {
   }
 }
 
-// Handle streaming responses (for future enhancement)
-async function handleGeminiStreamRequest(apiKey, message) {
+// Handle streaming responses
+async function handleGeminiStreamRequest(apiKey, message, tabId) {
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent?alt=sse&key=${apiKey}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          systemInstruction: {
+            parts: [{
+              text: "You are a helpful assistant. You are named Linkedin AI Premium and help people learn new things and network."
+            }]
+          },
           contents: [{
             parts: [{
               text: message
@@ -71,31 +88,35 @@ async function handleGeminiStreamRequest(apiKey, message) {
             temperature: 0.7,
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 1024,
+            maxOutputTokens: 2048,
           }
         })
       }
     );
 
     if (!response.ok) {
-      throw new Error('API request failed');
+      const error = await response.json();
+      throw new Error(error.error?.message || 'API request failed');
     }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let fullText = '';
+    let buffer = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n').filter(line => line.trim());
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
       
       for (const line of lines) {
+        if (!line.trim() || line.trim() === 'data: [DONE]') continue;
+        
         if (line.startsWith('data: ')) {
-          const jsonStr = line.slice(6);
-          if (jsonStr === '[DONE]') continue;
+          const jsonStr = line.slice(6).trim();
           
           try {
             const data = JSON.parse(jsonStr);
@@ -103,19 +124,20 @@ async function handleGeminiStreamRequest(apiKey, message) {
             if (text) {
               fullText += text;
               // Send incremental updates to content script
-              chrome.tabs.sendMessage(sender.tab.id, {
+              chrome.tabs.sendMessage(tabId, {
                 type: 'GEMINI_STREAM_CHUNK',
-                text: text
+                text: text,
+                fullText: fullText
               });
             }
           } catch (e) {
-            // Skip invalid JSON
+            console.error('Error parsing stream chunk:', e, jsonStr);
           }
         }
       }
     }
 
-    return { text: fullText };
+    return { text: fullText, streaming: true };
   } catch (error) {
     console.error('Gemini Streaming Error:', error);
     throw error;
