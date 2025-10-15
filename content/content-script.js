@@ -250,6 +250,8 @@ class LinkedInAI {
     this.lastUserMessage = null;
     // Track clicked quick actions to avoid suggesting them again
     this.clickedActions = new Set();
+    // Track if new chat divider was already added without any new messages since
+    this.newChatDividerAdded = false;
     this.init();
     this.setupMessageListener();
   }
@@ -275,8 +277,8 @@ class LinkedInAI {
     // Wait for LinkedIn to load
     await this.waitForLinkedInLoad();
     
-    // Inject the AI button
-    this.injectAIButton();
+    // DEPRECATED: AI button injection - replaced with section-based approach
+    // this.injectAIButton();
     
     // Inject the AI Premium section
     this.injectAIPremiumSection();
@@ -794,6 +796,25 @@ Clean, simple sentence about how to improve my profile for this person
   }
 
   createAIButton() {
+    // DEPRECATED: Blue "AI" button has been replaced with section-based approach
+    // 
+    // Why deprecated:
+    // 1. UX: Section provides better context and discoverability than a small button
+    // 2. UX: Section shows clear value proposition ("Ask anything about [name]")
+    // 3. UX: Section includes quick action pills (Summarize, Draft messages, etc.)
+    // 4. UX: Section feels more integrated with LinkedIn's native design patterns
+    // 5. UX: Section reduces cognitive load by showing capabilities upfront
+    // 6. UX: Section provides better accessibility with larger touch targets
+    // 7. UX: Section aligns with modern UI patterns where AI features are contextual
+    //
+    // The section-based approach is superior because:
+    // - Users immediately understand what the AI can do
+    // - Quick actions reduce friction for common tasks
+    // - Better visual hierarchy and information architecture
+    // - More professional appearance that matches LinkedIn's design language
+    // - Contextual placement makes the feature feel native to the platform
+    
+    /*
     const button = document.createElement('button');
     button.id = 'linkedin-ai-button';
     button.className = 'linkedin-ai-button';
@@ -822,6 +843,10 @@ Clean, simple sentence about how to improve my profile for this person
     });
 
     return button;
+    */
+    
+    // Return null since button is deprecated
+    return null;
   }
 
   waitForLinkedInLoad() {
@@ -998,19 +1023,17 @@ Clean, simple sentence about how to improve my profile for this person
         <div data-layer="fixed chat bar" class="chat-input-bar">
           <div data-layer="overlay prompt input box" class="input-container">
             <div data-layer="flexbox" class="input-wrapper">
-              <textarea data-layer="text input/placeholder" class="chat-input" id="chat-input" placeholder="Ask anything" rows="1" aria-label="Type your message"></textarea>
+              <textarea data-layer="text input/placeholder, on website load cursor is automatically placed here" class="chat-input" id="chat-input" placeholder="Ask anything" rows="1" aria-label="Type your message"></textarea>
             </div>
-            <button data-layer="dictate/mic button" class="mic-button" id="mic-btn" type="button" title="Voice input">
-              <svg width="33" height="36" viewBox="0 0 33 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M22.5336 18.1924C22.8785 18.295 23.0755 18.6579 22.9728 19.0027L22.8943 19.2468C22.1048 21.5529 20.0283 23.2612 17.5208 23.5161L17.5217 24.6969H18.9111L19.0421 24.7102C19.3391 24.771 19.5627 25.0335 19.5627 25.3484C19.5627 25.6633 19.3391 25.9259 19.0421 25.9867L18.9111 26H14.8283C14.4686 25.9999 14.1767 25.7082 14.1767 25.3484C14.1767 24.9887 14.4686 24.697 14.8283 24.6969H16.2186L16.2176 23.5161C13.71 23.2612 11.6337 21.5529 10.8441 19.2468L10.7656 19.0027L10.7407 18.8726C10.7143 18.5707 10.903 18.2821 11.2048 18.1924C11.5066 18.1026 11.8217 18.2416 11.9645 18.509L12.0152 18.6306L12.0774 18.8248C12.7593 20.8164 14.6478 22.2474 16.8692 22.2474C19.1622 22.2473 21.1005 20.7228 21.7231 18.6306L21.7739 18.509C21.9168 18.2416 22.2318 18.1025 22.5336 18.1924ZM19.0757 13.5096C19.0757 12.2913 18.0884 11.3034 16.8702 11.3032C15.6517 11.3032 14.6637 12.2912 14.6637 13.5096V17.1838C14.6639 18.4021 15.6518 19.3894 16.8702 19.3894C18.0883 19.3892 19.0755 18.402 19.0757 17.1838V13.5096ZM20.3789 17.1838C20.3787 19.1217 18.808 20.6924 16.8702 20.6925C14.9321 20.6925 13.3607 19.1218 13.3605 17.1838V13.5096C13.3605 11.5715 14.932 10 16.8702 10C18.8082 10.0002 20.3789 11.5716 20.3789 13.5096V17.1838Z" fill="white" fill-opacity="0.95"/>
+            <button data-svg-wrapper data-layer="dictate/mic button" class="mic-button" id="mic-btn" type="button" title="Voice input">
+              <svg width="34" height="36" viewBox="0 0 34 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22.7651 18.1924C23.11 18.295 23.3069 18.6579 23.2042 19.0027L23.1257 19.2468C22.3362 21.5529 20.2598 23.2612 17.7523 23.5161L17.7532 24.6969H19.1425L19.2736 24.7102C19.5706 24.771 19.7942 25.0335 19.7942 25.3484C19.7942 25.6633 19.5706 25.9259 19.2736 25.9867L19.1425 26H15.0597C14.7 25.9999 14.4081 25.7082 14.4081 25.3484C14.4081 24.9887 14.7 24.697 15.0597 24.6969H16.45L16.449 23.5161C13.9415 23.2612 11.8651 21.5529 11.0755 19.2468L10.9971 19.0027L10.9722 18.8726C10.9458 18.5707 11.1345 18.2821 11.4362 18.1924C11.7381 18.1026 12.0531 18.2416 12.196 18.509L12.2467 18.6306L12.3089 18.8248C12.9908 20.8164 14.8792 22.2474 17.1006 22.2474C19.3936 22.2473 21.3319 20.7228 21.9546 18.6306L22.0053 18.509C22.1482 18.2416 22.4632 18.1025 22.7651 18.1924ZM19.3071 13.5096C19.3071 12.2913 18.3199 11.3034 17.1016 11.3032C15.8832 11.3032 14.8952 12.2912 14.8952 13.5096V17.1838C14.8953 18.4021 15.8833 19.3894 17.1016 19.3894C18.3198 19.3892 19.3069 18.402 19.3071 17.1838V13.5096ZM20.6103 17.1838C20.6101 19.1217 19.0394 20.6924 17.1016 20.6925C15.1636 20.6925 13.5921 19.1218 13.592 17.1838V13.5096C13.592 11.5715 15.1635 10 17.1016 10C19.0396 10.0002 20.6103 11.5716 20.6103 13.5096V17.1838Z" fill="white" fill-opacity="0.95"/>
               </svg>
             </button>
-            <button data-layer="send button greyed out when no text/image input" class="send-button" id="send-btn" type="button" title="Send message" disabled>
-              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <g opacity="0.5">
-                  <rect width="36" height="36" rx="18" fill="white" fill-opacity="0.95"/>
-                  <path fill-rule="evenodd" clip-rule="evenodd" d="M14.5619 18.1299L16.8717 15.8202V23.3716C16.8717 23.9948 17.3769 24.5 18.0001 24.5C18.6233 24.5 19.1286 23.9948 19.1286 23.3716V15.8202L21.4383 18.1299C21.8789 18.5706 22.5934 18.5706 23.0341 18.1299C23.4748 17.6893 23.4748 16.9748 23.0341 16.5341L18.0001 11.5L12.966 16.5341C12.5253 16.9748 12.5253 17.6893 12.966 18.1299C13.4067 18.5706 14.1212 18.5706 14.5619 18.1299Z" fill="black"/>
-                </g>
+            <button data-svg-wrapper data-layer="send button greyed out when no text/image input" class="send-button" id="send-btn" type="button" title="Send message" disabled>
+              <svg width="37" height="36" viewBox="0 0 37 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect class="send-button-bg" x="0.5" width="36" height="36" rx="18" fill="white" fill-opacity="0.12"/>
+                <path class="send-button-icon" d="M13.5 17.5L17.5 14.66V24.5H19.5V14.66L23.5 17.5V15.05L18.5 11.5L13.5 15.05V17.5Z" fill="white" fill-opacity="0.5"/>
               </svg>
             </button>
           </div>
@@ -1030,7 +1053,7 @@ Clean, simple sentence about how to improve my profile for this person
                 <path d="M11 17.5C10.7033 17.5 10.4133 17.412 10.1666 17.2472C9.91997 17.0824 9.72771 16.8481 9.61418 16.574C9.50065 16.2999 9.47094 15.9983 9.52882 15.7074C9.5867 15.4164 9.72956 15.1491 9.93934 14.9393C10.1491 14.7296 10.4164 14.5867 10.7074 14.5288C10.9983 14.4709 11.2999 14.5006 11.574 14.6142C11.8481 14.7277 12.0824 14.92 12.2472 15.1666C12.412 15.4133 12.5 15.7033 12.5 16C12.5 16.3978 12.342 16.7794 12.0607 17.0607C11.7794 17.342 11.3978 17.5 11 17.5ZM19.5 16C19.5 16.2967 19.588 16.5867 19.7528 16.8334C19.9176 17.08 20.1519 17.2723 20.426 17.3858C20.7001 17.4994 21.0017 17.5291 21.2926 17.4712C21.5836 17.4133 21.8509 17.2704 22.0607 17.0607C22.2704 16.8509 22.4133 16.5836 22.4712 16.2926C22.5291 16.0017 22.4994 15.7001 22.3858 15.426C22.2723 15.1519 22.08 14.9176 21.8334 14.7528C21.5867 14.588 21.2967 14.5 21 14.5C20.6022 14.5 20.2206 14.658 19.9393 14.9393C19.658 15.2206 19.5 15.6022 19.5 16ZM14.5 16C14.5 16.2967 14.588 16.5867 14.7528 16.8334C14.9176 17.08 15.1519 17.2723 15.426 17.3858C15.7001 17.4994 16.0017 17.5291 16.2926 17.4712C16.5836 17.4133 16.8509 17.2704 17.0607 17.0607C17.2704 16.8509 17.4133 16.5836 17.4712 16.2926C17.5291 16.0017 17.4994 15.7001 17.3858 15.426C17.2723 15.1519 17.08 14.9176 16.8334 14.7528C16.5867 14.588 16.2967 14.5 16 14.5C15.6022 14.5 15.2206 14.658 14.9393 14.9393C14.658 15.2206 14.5 15.6022 14.5 16Z" fill="white" fill-opacity="0.65"/>
               </svg>
             </div>
-            <div data-svg-wrapper data-layer="new chat button. clears chat history and chats new chat in same place." className="new-chat-button" id="new-chat-btn" role="button" tabindex="0" aria-label="New chat">
+            <div data-svg-wrapper data-layer="new chat button. adds divider and starts new chat session." className="new-chat-button" id="new-chat-btn" role="button" tabindex="0" aria-label="New chat">
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22.4998 11.0299C22.483 11.4065 22.3261 11.7632 22.0598 12.0299L16.6498 17.4999L13.4998 18.4999L14.4998 15.3799L19.9398 9.93994C20.1513 9.72852 20.4213 9.58518 20.7149 9.52833C21.0085 9.47147 21.3125 9.5037 21.5877 9.62087C21.8628 9.73804 22.0967 9.9348 22.2592 10.1859C22.4218 10.437 22.5055 10.7309 22.4998 11.0299ZM19.4998 19.4999C19.4998 19.7652 19.3944 20.0195 19.2069 20.207C19.0193 20.3946 18.765 20.4999 18.4998 20.4999H12.4998C12.2345 20.4999 11.9802 20.3946 11.7926 20.207C11.6051 20.0195 11.4998 19.7652 11.4998 19.4999V13.4999C11.4998 13.2347 11.6051 12.9804 11.7926 12.7928C11.9802 12.6053 12.2345 12.4999 12.4998 12.4999H15.4998V10.4999H12.4998C11.7041 10.4999 10.941 10.816 10.3784 11.3786C9.81583 11.9412 9.49976 12.7043 9.49976 13.4999V19.4999C9.49976 20.2956 9.81583 21.0586 10.3784 21.6213C10.941 22.1839 11.7041 22.4999 12.4998 22.4999H18.4998C19.2954 22.4999 20.0585 22.1839 20.6211 21.6213C21.1837 21.0586 21.4998 20.2956 21.4998 19.4999V16.4999H19.4998V19.4999Z" fill="white" fill-opacity="0.65"/>
               </svg>
@@ -1072,10 +1095,41 @@ Clean, simple sentence about how to improve my profile for this person
     };
 
     const handleNewChat = async () => {
-      // Clear chat messages from UI
+      // Only add new chat divider if one hasn't already been added since last message
       const messagesContainer = document.getElementById('chat-messages');
-      if (messagesContainer) {
-        messagesContainer.innerHTML = '';
+      if (messagesContainer && !this.newChatDividerAdded) {
+        const divider = document.createElement('div');
+        divider.setAttribute('data-layer', 'new chat divider');
+        divider.className = 'NewChatDivider';
+        divider.style.cssText = 'align-self: stretch; padding-top: 12px; padding-bottom: 12px; justify-content: center; align-items: center; gap: 8px; display: inline-flex;';
+        
+        const leftDivider = document.createElement('div');
+        leftDivider.setAttribute('data-layer', 'divider');
+        leftDivider.className = 'Divider';
+        leftDivider.style.cssText = 'flex: 1 1 0; height: 1px; position: relative; background: rgba(255, 255, 255, 0.10);';
+        
+        const newChatText = document.createElement('div');
+        newChatText.setAttribute('data-layer', 'new chat');
+        newChatText.className = 'NewChat';
+        newChatText.style.cssText = 'text-align: center; color: rgba(255, 255, 255, 0.65); font-size: 12px; font-family: SF Pro; font-weight: 400; word-wrap: break-word;';
+        newChatText.textContent = 'New chat';
+        
+        const rightDivider = document.createElement('div');
+        rightDivider.setAttribute('data-layer', 'divider');
+        rightDivider.className = 'Divider';
+        rightDivider.style.cssText = 'flex: 1 1 0; height: 1px; position: relative; background: rgba(255, 255, 255, 0.10);';
+        
+        divider.appendChild(leftDivider);
+        divider.appendChild(newChatText);
+        divider.appendChild(rightDivider);
+        
+        messagesContainer.appendChild(divider);
+        
+        // Scroll to the bottom to show the new divider
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Mark that divider has been added
+        this.newChatDividerAdded = true;
       }
       
       // Reset message count and streaming state
@@ -1335,6 +1389,9 @@ Clean, simple sentence about how to improve my profile for this person
     const messagesContainer = document.getElementById('chat-messages');
     if (!messagesContainer) return;
 
+    // Reset the new chat divider flag when any message is added
+    this.newChatDividerAdded = false;
+
     if (role === 'user') {
       const bubble = document.createElement('div');
       bubble.setAttribute('data-layer', 'message bubble');
@@ -1347,6 +1404,19 @@ Clean, simple sentence about how to improve my profile for this person
 
       bubble.appendChild(textDiv);
       messagesContainer.appendChild(bubble);
+      
+      // Autoscroll to the user message with 96px offset from top
+      setTimeout(() => {
+        const chatContent = document.getElementById('chat-content');
+        if (chatContent && bubble) {
+          const bubblePosition = bubble.offsetTop;
+          chatContent.scrollTo({
+            top: bubblePosition - 148,
+            behavior: 'smooth'
+          });
+        }
+      }, 0);
+      
       return;
     }
 
@@ -2481,6 +2551,20 @@ ${profile.dom}`;
       chat.messages.forEach(msg => {
         this.addMessage(msg.role, msg.content);
       });
+      
+      // After loading all messages, scroll to the last user message without animation
+      setTimeout(() => {
+        const chatContent = document.getElementById('chat-content');
+        const userMessages = document.querySelectorAll('.user-message');
+        
+        if (chatContent && userMessages.length > 0) {
+          const lastUserMessage = userMessages[userMessages.length - 1];
+          const messagePosition = lastUserMessage.offsetTop;
+          
+          // Instant scroll (no animation) to position the message at 148px from top
+          chatContent.scrollTop = messagePosition - 148;
+        }
+      }, 0);
     }
     // AI summaries are no longer shown automatically - users must request them
   }
@@ -2783,9 +2867,10 @@ ${profile.dom}`;
           oldSection.remove();
         }
         
-        // Wait a bit for LinkedIn to render the new profile, then inject button and section
+        // Wait a bit for LinkedIn to render the new profile, then inject section
         setTimeout(() => {
-          this.injectAIButton();
+          // DEPRECATED: AI button injection - replaced with section-based approach
+          // this.injectAIButton();
           this.injectAIPremiumSection();
         }, 1000);
         
@@ -2810,11 +2895,14 @@ ${profile.dom}`;
       // Only check every 10 mutations to reduce overhead
       checkCount++;
       if (checkCount % 10 === 0 && (window.location.href.includes('/in/') || window.location.href.includes('/company/'))) {
+        // DEPRECATED: AI button monitoring - replaced with section-based approach
+        /*
         const button = document.getElementById('linkedin-ai-button');
         if (!button || !button.isConnected) {
           console.log('LinkedIn AI: Button was removed by LinkedIn, re-injecting...');
           setTimeout(() => this.injectAIButton(), 500);
         }
+        */
         
         const section = document.getElementById('linkedin-ai-premium-section');
         if (window.location.href.match(/linkedin\.com\/in\/[^/]+\/?$/) && (!section || !section.isConnected)) {
@@ -2862,10 +2950,13 @@ window.LinkedInAI_Debug = {
       });
     }
   },
+  // DEPRECATED: AI button injection - replaced with section-based approach
+  /*
   injectButton: () => {
     const ai = new LinkedInAI();
     ai.injectAIButton();
   },
+  */
   injectPremiumSection: () => {
     const ai = new LinkedInAI();
     ai.injectAIPremiumSection();

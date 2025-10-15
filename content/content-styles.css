@@ -13,7 +13,17 @@
   }
 }
 
-/* AI Button - matches LinkedIn native buttons */
+/* DEPRECATED: AI Button styles - replaced with section-based approach
+ * 
+ * Why deprecated:
+ * - Section provides better UX with contextual information
+ * - Section shows capabilities upfront (Summarize, Draft messages, etc.)
+ * - Section integrates better with LinkedIn's design patterns
+ * - Section reduces cognitive load and improves discoverability
+ * - Section provides better accessibility with larger touch targets
+ */
+
+/*
 button#linkedin-ai-button.linkedin-ai-button,
 button#linkedin-ai-button {
   display: inline-flex !important;
@@ -61,6 +71,7 @@ button#linkedin-ai-button.linkedin-ai-button:active {
   background-color: rgba(255, 255, 255, 0.08) !important;
   transform: scale(0.98) !important;
 }
+*/
 
 .linkedin-ai-chat-container {
   position: fixed;
@@ -93,7 +104,7 @@ button#linkedin-ai-button.linkedin-ai-button:active {
   height: 100%;
   max-height: 909px;
   padding: 48px 12px 96px 12px;
-  background-color: #1B2023;
+  background-color: #1B1F23;
   border-top-left-radius: 8px;
   border-top-right-radius: 8px;
   outline: 1px solid rgba(255, 255, 255, 0.1);
@@ -118,17 +129,13 @@ button#linkedin-ai-button.linkedin-ai-button:active {
 }
 
 .chat-caption {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 4px;
+  align-self: stretch;
   text-align: center;
   font-size: 12px;
   font-family: 'SF Pro', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   font-weight: 400;
   color: rgba(255, 255, 255, 0.65);
-  flex-shrink: 0;
+  word-wrap: break-word;
 }
 
 .caption-text {
@@ -154,7 +161,7 @@ button#linkedin-ai-button.linkedin-ai-button:active {
   align-items: center;
   gap: 8px;
   padding: 8px;
-  background: #1B2023;
+  background: #1B1F23;
   box-sizing: border-box;
   z-index: 3;
   box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.1);
@@ -163,7 +170,7 @@ button#linkedin-ai-button.linkedin-ai-button:active {
 }
 
 .chat-navbar:hover {
-  background: #1B2023;
+  background: #1B1F23;
 }
 
 .chat-navbar:hover::before {
@@ -228,7 +235,10 @@ button#linkedin-ai-button.linkedin-ai-button:active {
   left: 0;
   bottom: 0;
   width: 400px;
-  padding: 12px;
+  padding-bottom: 12px;
+  padding-left: 12px;
+  padding-right: 12px;
+  background: linear-gradient(180deg, rgba(27, 31, 35, 0) 0%, #1B1F23 50%);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -245,8 +255,11 @@ button#linkedin-ai-button.linkedin-ai-button:active {
   justify-content: flex-end;
   align-items: flex-end;
   gap: 8px;
-  padding: 10px 10px 10px 16px;
-  background: rgba(255, 255, 255, 0.12);
+  padding-top: 6px;
+  padding-bottom: 6px;
+  padding-left: 16px;
+  padding-right: 6px;
+  background: #373B3E;
   border-radius: 28px;
   box-sizing: border-box;
   border: none;
@@ -261,7 +274,8 @@ button#linkedin-ai-button.linkedin-ai-button:active {
   justify-content: flex-start;
   align-items: flex-start;
   gap: 18px;
-  padding-top: 6px;
+  padding-top: 7px;
+  padding-bottom: 8px;
 }
 
 .chat-input {
@@ -319,6 +333,7 @@ button#linkedin-ai-button.linkedin-ai-button:active {
   border: none;
   cursor: pointer;
   padding: 0;
+  transition: opacity 150ms ease;
 }
 
 .mic-button:hover,
@@ -328,11 +343,28 @@ button#linkedin-ai-button.linkedin-ai-button:active {
 
 .send-button[disabled] {
   cursor: not-allowed;
-  opacity: 0.6;
 }
 
-.send-button[disabled] svg {
-  opacity: 0.6;
+/* Send button disabled state (greyed out) */
+.send-button[disabled] .send-button-bg {
+  fill: white;
+  fill-opacity: 0.12;
+}
+
+.send-button[disabled] .send-button-icon {
+  fill: white;
+  fill-opacity: 0.5;
+}
+
+/* Send button enabled state (LinkedIn blue) */
+.send-button:not([disabled]) .send-button-bg {
+  fill: #0A66C2;
+  fill-opacity: 1;
+}
+
+.send-button:not([disabled]) .send-button-icon {
+  fill: white;
+  fill-opacity: 1;
 }
 
 .chat-viewport {
@@ -820,7 +852,7 @@ button#linkedin-ai-button.linkedin-ai-button:active {
 }
 
 .feedback-modal-content {
-  background: #1B2023;
+  background: #1B1F23;
   border-radius: 8px;
   padding: 24px;
   width: 336px;
@@ -967,6 +999,36 @@ button#linkedin-ai-button.linkedin-ai-button:active {
 }
 
 /* Responsive */
+/* New Chat Divider Styles */
+.NewChatDivider {
+  align-self: stretch;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  display: inline-flex;
+  width: 100%;
+}
+
+.Divider {
+  flex: 1 1 0;
+  height: 1px;
+  position: relative;
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.NewChat {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 12px;
+  font-family: 'SF Pro', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-weight: 400;
+  word-wrap: break-word;
+  white-space: nowrap;
+  padding: 0 8px;
+}
+
 @media (max-width: 768px) {
   .linkedin-ai-chat-container {
     width: 100%;
