@@ -63,10 +63,8 @@ class StorageManager {
 
       chats[profileHash].lastActive = new Date().toISOString();
 
-      // Keep only last 50 messages per profile
-      if (chats[profileHash].messages.length > 50) {
-        chats[profileHash].messages = chats[profileHash].messages.slice(-50);
-      }
+      // Chat history is now persistent - no message limit
+      // Messages can only be deleted from the settings page
 
       await chrome.storage.local.set({ chats });
       return { success: true };

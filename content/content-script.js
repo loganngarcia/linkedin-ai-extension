@@ -78,9 +78,9 @@ async function htmlToImage(htmlContent) {
       // foreignObject allows embedding HTML/DOM elements within SVG
       // This is crucial for rendering complex CSS like flexbox, custom fonts, etc.
       const svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="320" height="480">
-          <foreignObject width="320" height="480">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="width: 320px; height: 480px; margin: 0; padding: 0;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="640" height="960">
+          <foreignObject width="640" height="960">
+            <div xmlns="http://www.w3.org/1999/xhtml" style="width: 640px; height: 960px; margin: 0; padding: 0;">
               ${htmlContent}
             </div>
           </foreignObject>
@@ -106,17 +106,17 @@ async function htmlToImage(htmlContent) {
         
         // Create canvas to convert the rendered SVG to raster image
         const canvas = document.createElement('canvas');
-        canvas.width = 320;  // Fixed width for share sheet
-        canvas.height = 480; // Fixed height for share sheet
+        canvas.width = 640;  // 2x resolution for share sheet
+        canvas.height = 960; // 2x resolution for share sheet
         const ctx = canvas.getContext('2d', { willReadFrequently: false });
         
         // Draw white background first (SVG might have transparent areas)
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, 320, 480);
+        ctx.fillRect(0, 0, 640, 960);
         
         // Draw the rendered SVG image onto canvas
         // This converts the vector SVG to raster PNG
-        ctx.drawImage(img, 0, 0, 320, 480);
+        ctx.drawImage(img, 0, 0, 640, 960);
         
         console.log('Canvas created, converting to blob...');
         
@@ -1125,38 +1125,38 @@ Clean, simple sentence about how to improve my profile for this person
         
         messagesContainer.appendChild(divider);
         
-        // Autoscroll to the new divider with same logic as addMessage
-        setTimeout(() => {
-          const chatContent = document.getElementById('chat-content');
-          if (chatContent && divider) {
-            const dividerPosition = divider.offsetTop;
+        // Add a spacer after quick actions to create empty void below them
+        // This creates a 65vh empty space below AI suggestions
+        const chatContent = document.getElementById('chat-content');
+        const quickActions = document.getElementById('quick-actions');
+        
+        if (chatContent && quickActions) {
+          const spacer = document.createElement('div');
+          spacer.setAttribute('data-layer', 'new chat spacer');
+          spacer.className = 'NewChatSpacer';
+          spacer.style.cssText = 'height: 65vh; width: 100%; flex-shrink: 0;';
+          
+          // Insert spacer after quick actions
+          quickActions.parentNode.insertBefore(spacer, quickActions.nextSibling);
+          
+          // Scroll to show AI suggestions at top with empty void below
+          setTimeout(() => {
             chatContent.scrollTo({
-              top: dividerPosition - 148,
+              top: quickActions.offsetTop,
               behavior: 'smooth'
             });
-          }
-        }, 0);
+          }, 0);
+        }
         
         // Mark that divider has been added
         this.newChatDividerAdded = true;
       }
       
-      // Reset message count and streaming state
-      this.messageCount = 0;
-      this.streamingMessageId = null;
-      
       // Reset clicked actions tracking
       this.clickedActions.clear();
       
-      // Clear chat history from storage for current profile
-      const profileHash = this.hashProfile(window.location.href);
-      await chrome.storage.local.get(['chats']).then(result => {
-        const chats = result.chats || {};
-        if (chats[profileHash]) {
-          delete chats[profileHash];
-          chrome.storage.local.set({ chats });
-        }
-      });
+      // Chat history is now persistent - no longer cleared on new chat
+      // Messages can only be deleted from the settings page
       
       // Reset AI suggestions to default quick actions
       this.resetQuickActionsToDefault();
@@ -1401,6 +1401,13 @@ Clean, simple sentence about how to improve my profile for this person
     // Reset the new chat divider flag when any message is added
     this.newChatDividerAdded = false;
 
+    // Remove the new chat spacer if it exists (fills the void as messages appear)
+    const chatContent = document.getElementById('chat-content');
+    const spacer = chatContent?.querySelector('.NewChatSpacer');
+    if (spacer) {
+      spacer.remove();
+    }
+
     if (role === 'user') {
       const bubble = document.createElement('div');
       bubble.setAttribute('data-layer', 'message bubble');
@@ -1514,16 +1521,16 @@ Clean, simple sentence about how to improve my profile for this person
       // - Full width layout: Prevents text cutoff issues
       // - White background: Clean, professional appearance
       // - LinkedIn logo: Branding and attribution
-      const shareSheetHTML = `<div class="share-sheet" style="width: 320px; height: 480px; padding: 24px; position: relative; background: white; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; gap: 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;">
-  <div class="messages-container" style="width: 100%; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-end; gap: 10px;">
-    <div class="user-bubble" style="max-width: 224px; padding: 12px; background: rgba(0, 0, 0, 0.08); border-radius: 20px; word-wrap: break-word;">
-      <div class="user-text" style="color: rgba(0, 0, 0, 0.95); font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-weight: 400; line-height: 24px;">${userMessage}</div>
+      const shareSheetHTML = `<div class="share-sheet" style="width: 640px; height: 960px; padding: 48px; position: relative; background: white; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; gap: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; box-sizing: border-box;">
+  <div class="messages-container" style="width: 100%; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-end; gap: 20px;">
+    <div class="user-bubble" style="max-width: 448px; padding: 20px 24px; background: rgba(0, 0, 0, 0.08); border-radius: 48px; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; box-sizing: border-box;">
+      <div class="user-text" style="color: rgba(0, 0, 0, 0.95); font-size: 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-weight: 400; line-height: 48px; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word;">${userMessage}</div>
     </div>
   </div>
-  <div class="ai-response-text" style="width: 100%; flex: 1 1 0; overflow: hidden; color: rgba(0, 0, 0, 0.95); font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-weight: 400; line-height: 24px; word-wrap: break-word;">${aiResponse}</div>
-  <div class="logo-overlay" style="width: 320px; padding-top: 96px; padding-bottom: 24px; padding-left: 24px; padding-right: 24px; left: 0; top: 324.26px; position: absolute; background: linear-gradient(0deg, white 50%, rgba(255, 255, 255, 0) 100%); overflow: hidden; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 10px; display: flex;">
+  <div class="ai-response-text" style="width: 100%; flex: 1 1 0; overflow: hidden; color: rgba(0, 0, 0, 0.95); font-size: 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-weight: 400; line-height: 48px; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; white-space: pre-wrap;">${aiResponse}</div>
+  <div class="logo-overlay" style="width: 100%; padding-top: 192px; padding-bottom: 48px; padding-left: 48px; padding-right: 48px; left: 0; top: 648.52px; position: absolute; background: linear-gradient(0deg, white 50%, rgba(255, 255, 255, 0) 100%); overflow: hidden; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 20px; display: flex; pointer-events: none; box-sizing: border-box;">
     <div class="linkedin-logo">
-      <svg width="144" height="37" viewBox="0 0 144 37" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width="288" height="74" viewBox="0 0 144 37" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path fill-rule="evenodd" clip-rule="evenodd" d="M110.712 0.264648C109.245 0.264648 108 1.42645 108 2.85617V33.6731C108 35.1046 108.816 36.2646 110.283 36.2646H140.963C142.432 36.2646 144 35.1046 144 33.6731V2.85617C144 1.42645 142.861 0.264648 141.392 0.264648H110.712ZM115.714 4.76465C117.49 4.76465 118.929 6.20293 118.929 7.97893C118.929 9.75493 117.49 11.1932 115.714 11.1932C113.938 11.1932 112.5 9.75493 112.5 7.97893C112.5 6.20293 113.938 4.76465 115.714 4.76465ZM21.4319 4.89185C19.7296 4.89185 18.3415 6.2749 18.3415 7.9789C18.3415 9.6829 19.7296 11.066 21.4319 11.066C23.1359 11.066 24.5156 9.6829 24.5156 7.9789C24.5156 6.2749 23.1359 4.89185 21.4319 4.89185ZM0 5.40751V31.1218H15.4286V25.9789H5.14286V5.40751H0ZM48 5.40751V31.1218H53.1429V22.5504L59.4844 31.1218H65.5547L58.2857 21.7501L65.1429 13.9789H59.1429L53.1429 20.8361V5.40751H48ZM97.7143 5.40751V16.0214H97.6641C96.6166 14.7562 94.8851 13.7646 92.0993 13.7646C87.5993 13.7646 83.9632 17.2905 83.9632 22.5705C83.9632 28.1127 87.6529 31.3361 91.9386 31.3361C95.0826 31.3361 96.9376 30.3171 98.0056 29.0794H98.0558V31.1218H102.857V5.40751H97.7143ZM37.9487 13.7646C35.2504 13.7646 33.0659 15.1179 32.327 16.4499H32.2735V13.9789H27.4286V31.1218H32.5714V22.8885C32.5714 20.312 33.8032 18.2646 36.3884 18.2646C38.5175 18.2646 39.4286 20.0202 39.4286 22.5437V31.1218H44.5714V21.6062C44.5714 17.0496 43.1275 13.7646 37.9487 13.7646ZM74.106 13.7646C68.2483 13.7646 65.1429 17.1921 65.1429 22.1687C65.1429 27.7709 68.5708 31.3361 73.9554 31.3361C77.9908 31.3361 80.4894 29.9315 81.7031 28.3595L78.5022 25.7646C77.8097 26.7058 76.2745 27.9075 74.0391 27.9075C71.4779 27.9075 70.3623 26.1006 70.0246 24.6229L69.9978 24.0939H82.192C82.192 24.0939 82.2858 23.5166 82.2858 22.9321C82.2858 17.0881 79.1649 13.7646 74.106 13.7646ZM132.234 13.7646C137.413 13.7646 138.857 16.513 138.857 21.6062V31.1218H133.714V22.5437C133.714 20.2637 132.803 18.2646 130.674 18.2646C128.089 18.2646 126.857 20.0154 126.857 22.8885V31.1218H121.714V13.9789H126.559V16.4499H126.613C127.351 15.1179 129.536 13.7646 132.234 13.7646ZM18.8571 13.9789V31.1218H24V13.9789H18.8571ZM113.143 13.9789H118.286V31.1218H113.143V13.9789ZM73.952 17.1932C76.0434 17.1932 77.3713 19.0275 77.3371 20.8361H69.9978C70.1366 19.1372 71.4629 17.1932 73.952 17.1932ZM93.3918 17.6218C96.3352 17.6218 98.0558 19.5823 98.0558 22.5068C98.0558 25.3526 96.3352 27.4789 93.3918 27.4789C90.4518 27.4789 88.8013 25.296 88.8013 22.5068C88.8013 19.7194 90.4518 17.6218 93.3918 17.6218Z" fill="#0A66C2"/>
       </svg>
     </div>
@@ -1545,10 +1552,10 @@ Clean, simple sentence about how to improve my profile for this person
         // Check if browser supports file sharing via Web Share API
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [imageFile] })) {
           console.log('Sharing image via Web Share API...');
-          await navigator.share({
-            files: [imageFile],
-            title: 'AI Response'
-          });
+            await navigator.share({
+              files: [imageFile],
+              text: 'linkedin.com/ai'
+            });
           console.log('Image shared successfully');
           return; // Success - exit early
         } 
@@ -1582,10 +1589,10 @@ Clean, simple sentence about how to improve my profile for this person
         if (navigator.share) {
           try {
             console.log('Sharing text via Web Share API...');
-            await navigator.share({
-              title: 'AI Response',
-              text: plainText
-            });
+              await navigator.share({
+                title: 'linkedin.com/ai',
+                text: plainText
+              });
             console.log('Text shared successfully');
             return; // Success - exit early
           } catch (shareErr) {
@@ -2169,16 +2176,16 @@ Clean, simple sentence about how to improve my profile for this person
       // - Full width layout: Prevents text cutoff issues
       // - White background: Clean, professional appearance
       // - LinkedIn logo: Branding and attribution
-      const shareSheetHTML = `<div class="share-sheet" style="width: 320px; height: 480px; padding: 24px; position: relative; background: white; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; gap: 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;">
-  <div class="messages-container" style="width: 100%; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-end; gap: 10px;">
-    <div class="user-bubble" style="max-width: 224px; padding: 12px; background: rgba(0, 0, 0, 0.08); border-radius: 20px; word-wrap: break-word;">
-      <div class="user-text" style="color: rgba(0, 0, 0, 0.95); font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-weight: 400; line-height: 24px;">${userMessage}</div>
+      const shareSheetHTML = `<div class="share-sheet" style="width: 640px; height: 960px; padding: 48px; position: relative; background: white; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; gap: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; box-sizing: border-box;">
+  <div class="messages-container" style="width: 100%; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-end; gap: 20px;">
+    <div class="user-bubble" style="max-width: 448px; padding: 20px 24px; background: rgba(0, 0, 0, 0.08); border-radius: 48px; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; box-sizing: border-box;">
+      <div class="user-text" style="color: rgba(0, 0, 0, 0.95); font-size: 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-weight: 400; line-height: 48px; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word;">${userMessage}</div>
     </div>
   </div>
-  <div class="ai-response-text" style="width: 100%; flex: 1 1 0; overflow: hidden; color: rgba(0, 0, 0, 0.95); font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-weight: 400; line-height: 24px; word-wrap: break-word;">${aiResponse}</div>
-  <div class="logo-overlay" style="width: 320px; padding-top: 96px; padding-bottom: 24px; padding-left: 24px; padding-right: 24px; left: 0; top: 324.26px; position: absolute; background: linear-gradient(0deg, white 50%, rgba(255, 255, 255, 0) 100%); overflow: hidden; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 10px; display: flex;">
+  <div class="ai-response-text" style="width: 100%; flex: 1 1 0; overflow: hidden; color: rgba(0, 0, 0, 0.95); font-size: 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-weight: 400; line-height: 48px; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; white-space: pre-wrap;">${aiResponse}</div>
+  <div class="logo-overlay" style="width: 100%; padding-top: 192px; padding-bottom: 48px; padding-left: 48px; padding-right: 48px; left: 0; top: 648.52px; position: absolute; background: linear-gradient(0deg, white 50%, rgba(255, 255, 255, 0) 100%); overflow: hidden; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 20px; display: flex; pointer-events: none; box-sizing: border-box;">
     <div class="linkedin-logo">
-      <svg width="144" height="37" viewBox="0 0 144 37" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width="288" height="74" viewBox="0 0 144 37" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path fill-rule="evenodd" clip-rule="evenodd" d="M110.712 0.264648C109.245 0.264648 108 1.42645 108 2.85617V33.6731C108 35.1046 108.816 36.2646 110.283 36.2646H140.963C142.432 36.2646 144 35.1046 144 33.6731V2.85617C144 1.42645 142.861 0.264648 141.392 0.264648H110.712ZM115.714 4.76465C117.49 4.76465 118.929 6.20293 118.929 7.97893C118.929 9.75493 117.49 11.1932 115.714 11.1932C113.938 11.1932 112.5 9.75493 112.5 7.97893C112.5 6.20293 113.938 4.76465 115.714 4.76465ZM21.4319 4.89185C19.7296 4.89185 18.3415 6.2749 18.3415 7.9789C18.3415 9.6829 19.7296 11.066 21.4319 11.066C23.1359 11.066 24.5156 9.6829 24.5156 7.9789C24.5156 6.2749 23.1359 4.89185 21.4319 4.89185ZM0 5.40751V31.1218H15.4286V25.9789H5.14286V5.40751H0ZM48 5.40751V31.1218H53.1429V22.5504L59.4844 31.1218H65.5547L58.2857 21.7501L65.1429 13.9789H59.1429L53.1429 20.8361V5.40751H48ZM97.7143 5.40751V16.0214H97.6641C96.6166 14.7562 94.8851 13.7646 92.0993 13.7646C87.5993 13.7646 83.9632 17.2905 83.9632 22.5705C83.9632 28.1127 87.6529 31.3361 91.9386 31.3361C95.0826 31.3361 96.9376 30.3171 98.0056 29.0794H98.0558V31.1218H102.857V5.40751H97.7143ZM37.9487 13.7646C35.2504 13.7646 33.0659 15.1179 32.327 16.4499H32.2735V13.9789H27.4286V31.1218H32.5714V22.8885C32.5714 20.312 33.8032 18.2646 36.3884 18.2646C38.5175 18.2646 39.4286 20.0202 39.4286 22.5437V31.1218H44.5714V21.6062C44.5714 17.0496 43.1275 13.7646 37.9487 13.7646ZM74.106 13.7646C68.2483 13.7646 65.1429 17.1921 65.1429 22.1687C65.1429 27.7709 68.5708 31.3361 73.9554 31.3361C77.9908 31.3361 80.4894 29.9315 81.7031 28.3595L78.5022 25.7646C77.8097 26.7058 76.2745 27.9075 74.0391 27.9075C71.4779 27.9075 70.3623 26.1006 70.0246 24.6229L69.9978 24.0939H82.192C82.192 24.0939 82.2858 23.5166 82.2858 22.9321C82.2858 17.0881 79.1649 13.7646 74.106 13.7646ZM132.234 13.7646C137.413 13.7646 138.857 16.513 138.857 21.6062V31.1218H133.714V22.5437C133.714 20.2637 132.803 18.2646 130.674 18.2646C128.089 18.2646 126.857 20.0154 126.857 22.8885V31.1218H121.714V13.9789H126.559V16.4499H126.613C127.351 15.1179 129.536 13.7646 132.234 13.7646ZM18.8571 13.9789V31.1218H24V13.9789H18.8571ZM113.143 13.9789H118.286V31.1218H113.143V13.9789ZM73.952 17.1932C76.0434 17.1932 77.3713 19.0275 77.3371 20.8361H69.9978C70.1366 19.1372 71.4629 17.1932 73.952 17.1932ZM93.3918 17.6218C96.3352 17.6218 98.0558 19.5823 98.0558 22.5068C98.0558 25.3526 96.3352 27.4789 93.3918 27.4789C90.4518 27.4789 88.8013 25.296 88.8013 22.5068C88.8013 19.7194 90.4518 17.6218 93.3918 17.6218Z" fill="#0A66C2"/>
       </svg>
     </div>
@@ -2200,10 +2207,10 @@ Clean, simple sentence about how to improve my profile for this person
         // Check if browser supports file sharing via Web Share API
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [imageFile] })) {
           console.log('Sharing image via Web Share API...');
-          await navigator.share({
-            files: [imageFile],
-            title: 'AI Response'
-          });
+            await navigator.share({
+              files: [imageFile],
+              text: 'linkedin.com/ai'
+            });
           console.log('Image shared successfully');
           return; // Success - exit early
         } 
@@ -2237,10 +2244,10 @@ Clean, simple sentence about how to improve my profile for this person
         if (navigator.share) {
           try {
             console.log('Sharing text via Web Share API...');
-            await navigator.share({
-              title: 'AI Response',
-              text: plainText
-            });
+              await navigator.share({
+                title: 'linkedin.com/ai',
+                text: plainText
+              });
             console.log('Text shared successfully');
             return; // Success - exit early
           } catch (shareErr) {
