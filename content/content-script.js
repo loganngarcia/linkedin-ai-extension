@@ -1125,8 +1125,17 @@ Clean, simple sentence about how to improve my profile for this person
         
         messagesContainer.appendChild(divider);
         
-        // Scroll to the bottom to show the new divider
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        // Autoscroll to the new divider with same logic as addMessage
+        setTimeout(() => {
+          const chatContent = document.getElementById('chat-content');
+          if (chatContent && divider) {
+            const dividerPosition = divider.offsetTop;
+            chatContent.scrollTo({
+              top: dividerPosition - 148,
+              behavior: 'smooth'
+            });
+          }
+        }, 0);
         
         // Mark that divider has been added
         this.newChatDividerAdded = true;
@@ -2051,18 +2060,24 @@ Clean, simple sentence about how to improve my profile for this person
     // Attach event listeners to action buttons
     this.attachMessageActionListeners(actionsDiv, content);
     
-    // Generate AI follow-up suggestions based on the response content
-    this.generateFollowUpSuggestions(content).then(suggestions => {
-      if (suggestions && suggestions.length > 0) {
-        this.updateQuickActions(suggestions);
-      } else {
-        // Fallback to contextual suggestions if AI suggestions fail
-        this.showContextualSuggestions();
-      }
-    });
-    
-    // Clear streaming message ID
+    // Clear streaming message ID immediately
     this.streamingMessageId = null;
+    
+    // Generate AI follow-up suggestions in the background (non-blocking)
+    // Use setTimeout to defer this to the next event loop cycle
+    setTimeout(() => {
+      this.generateFollowUpSuggestions(content).then(suggestions => {
+        if (suggestions && suggestions.length > 0) {
+          this.updateQuickActions(suggestions);
+        } else {
+          // Fallback to contextual suggestions if AI suggestions fail
+          this.showContextualSuggestions();
+        }
+      }).catch(err => {
+        console.error('Error generating follow-up suggestions:', err);
+        this.showContextualSuggestions();
+      });
+    }, 0);
   }
 
   hideSuggestionsDuringStreaming() {
