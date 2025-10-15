@@ -418,42 +418,76 @@ class LinkedInAI {
   }
 
   findPremiumSectionInsertionPoint() {
-    // Try to find the first profile section AFTER the top card
-    // (Highlights, About, Activity, Experience, etc.)
+    // Find the first actual content section (Highlights, About, Activity, Experience, etc.)
+    // Skip top card and any intermediate cards (Open to work, volunteering, etc.)
     const mainContent = document.querySelector('main.scaffold-layout__main') || 
                        document.querySelector('main');
     
     if (!mainContent) return null;
 
-    // Strategy: Find all sections and skip the first one (which is the top card with profile pic)
-    // LinkedIn profile sections typically use these selectors:
-    const allSections = mainContent.querySelectorAll('section.artdeco-card, div.pvs-list__outer-container, section[data-view-name]');
+    // Get all potential sections
+    const allSections = Array.from(mainContent.querySelectorAll('section.artdeco-card, div.pvs-list__outer-container'));
     
-    // Skip the first section (top card) and return the second one
-    // The second section is typically Highlights, About, or Activity
-    if (allSections.length >= 2) {
-      return allSections[1];
+    if (allSections.length === 0) return null;
+    
+    // Find the top card index (the section with profile photo and action buttons)
+    let topCardIndex = -1;
+    for (let i = 0; i < allSections.length; i++) {
+      const section = allSections[i];
+      const classes = section.className || '';
+      
+      // Top card has specific classes or contains Connect/Message buttons
+      if (classes.includes('pv-top-card') || 
+          classes.includes('top-card') ||
+          section.querySelector('button[aria-label*="Connect"]') ||
+          section.querySelector('button[aria-label*="Message"]') ||
+          section.querySelector('button[aria-label*="Follow"]') ||
+          section.querySelector('button[aria-label*="Open to"]')) {
+        topCardIndex = i;
+        break;
+      }
     }
     
-    // Fallback: if only one section found, it might be structured differently
-    // Try to find by looking for sections with specific IDs or attributes
-    const fallbackSelectors = [
-      'section[id*="highlights"]',
-      'section[id*="about"]',
-      'section[id*="activity"]',
-      'div.pvs-list__outer-container'
+    // If we found the top card, look for sections after it
+    if (topCardIndex >= 0) {
+      // Look for the first substantial content section after the top card
+      for (let i = topCardIndex + 1; i < allSections.length; i++) {
+        const section = allSections[i];
+        const classes = section.className || '';
+        const rect = section.getBoundingClientRect();
+        
+        // Skip very small intermediate cards (like "Open to work" badges)
+        if (rect.height < 80) {
+          continue;
+        }
+        
+        // Skip if it's still part of the top card area
+        if (classes.includes('pv-top-card') || classes.includes('top-card')) {
+          continue;
+        }
+        
+        // This is the first real content section
+        return section;
+      }
+    }
+    
+    // Fallback: Look for specific content sections by name/attribute
+    const contentSectionSelectors = [
+      'section[data-view-name="profile-card"]', // About section
+      'section.pv-profile-card:not(.pv-top-card)', // Profile cards but not top card
+      'div.pvs-list__outer-container',  // Experience, Education, etc.
     ];
     
-    for (const selector of fallbackSelectors) {
+    for (const selector of contentSectionSelectors) {
       const section = mainContent.querySelector(selector);
       if (section) {
         return section;
       }
     }
 
-    // Last resort: return the first section if we can't find anything better
-    if (allSections.length >= 1) {
-      return allSections[0];
+    // Last resort: If we have at least 2 sections, insert before the second one
+    if (allSections.length >= 2) {
+      return allSections[1];
     }
 
     return null;
@@ -495,9 +529,9 @@ class LinkedInAI {
               </g>
             </svg>
           </div>
-          <div data-layer="Ask anything about [name]" class="ai-premium-title" style="align-self: stretch; color: rgba(255, 255, 255, 0.95); font-size: 20px; font-family: 'SF Pro', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-weight: 600; line-height: 20px; word-wrap: break-word;">Ask anything about ${profileName}</div>
+          <div data-layer="Ask anything about [name]" class="ai-premium-title" style="align-self: stretch; color: rgba(255, 255, 255, 0.90); font-size: 20px; font-family: 'SF Pro', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-weight: 600; line-height: 20px; word-wrap: break-word;">Ask anything about ${profileName}</div>
         </div>
-        <div data-layer="description" class="ai-premium-description" style="align-self: stretch; justify-content: center; display: flex; flex-direction: column; color: rgba(255, 255, 255, 0.95); font-size: 14px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-weight: 400; line-height: 14px; word-wrap: break-word;">I'd be great to connect, based on your skills, experience, and chances of hearing back</div>
+        <div data-layer="description" class="ai-premium-description" style="align-self: stretch; justify-content: center; display: flex; flex-direction: column; color: rgba(255, 255, 255, 0.90); font-size: 14px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-weight: 400; line-height: 14px; word-wrap: break-word;">I'd be great to connect, based on your skills, experience, and chances of hearing back</div>
       </div>
       <div data-layer="flexbox" class="ai-premium-actions" style="align-self: stretch; justify-content: flex-start; align-items: flex-start; gap: 8px; display: inline-flex; flex-wrap: wrap;">
         <div data-svg-wrapper data-layer="open ai" class="ai-premium-open-btn" id="ai-premium-open-btn" style="cursor: pointer;" role="button" tabindex="0" aria-label="Open AI Premium chat">
@@ -524,6 +558,9 @@ class LinkedInAI {
       openAIBtn.addEventListener('click', () => {
         if (!this.chatOpen) {
           this.toggleChat();
+        } else if (this.chatCollapsed) {
+          // If chat is collapsed, expand it
+          this.toggleChatCollapse();
         }
       });
 
@@ -532,6 +569,9 @@ class LinkedInAI {
           e.preventDefault();
           if (!this.chatOpen) {
             this.toggleChat();
+          } else if (this.chatCollapsed) {
+            // If chat is collapsed, expand it
+            this.toggleChatCollapse();
           }
         }
       });
@@ -559,6 +599,12 @@ class LinkedInAI {
               this.triggerPremiumSectionAction(action);
             }, 300);
           });
+        } else if (this.chatCollapsed) {
+          // If chat is collapsed, expand it first, then trigger the action
+          this.toggleChatCollapse();
+          setTimeout(() => {
+            this.triggerPremiumSectionAction(action);
+          }, 150);
         } else {
           this.triggerPremiumSectionAction(action);
         }
@@ -573,6 +619,12 @@ class LinkedInAI {
                 this.triggerPremiumSectionAction(action);
               }, 300);
             });
+          } else if (this.chatCollapsed) {
+            // If chat is collapsed, expand it first, then trigger the action
+            this.toggleChatCollapse();
+            setTimeout(() => {
+              this.triggerPremiumSectionAction(action);
+            }, 150);
           } else {
             this.triggerPremiumSectionAction(action);
           }
@@ -796,13 +848,19 @@ Clean, simple sentence about how to improve my profile for this person
         return;
       }
 
-      // Scrape profile data
-      const profileData = await this.scrapeProfile();
-      this.currentProfile = profileData;
-
-      // Create chat interface
+      // Create chat interface immediately for instant feedback
       this.createChatInterface();
       this.chatOpen = true;
+
+      // Scrape profile data in the background
+      this.scrapeProfile().then(profileData => {
+        this.currentProfile = profileData;
+        // Optionally show a notification that profile data is ready
+        console.log('LinkedIn AI: Profile data loaded');
+      }).catch(err => {
+        console.error('LinkedIn AI: Error loading profile data:', err);
+        // Still usable even if profile scraping fails
+      });
     } else {
       const chatContainer = document.getElementById('linkedin-ai-chat');
       if (chatContainer) {
@@ -2267,22 +2325,8 @@ ${profile.dom}`;
 
   async scrapeProfile() {
     try {
-      const profileHash = this.hashProfile(window.location.href);
-      
-      // Check if we already have a summary for this profile
-      const result = await chrome.storage.local.get(['profile_summaries']);
-      const summaries = result.profile_summaries || {};
-      
-      if (summaries[profileHash] && summaries[profileHash].summary) {
-        // Use cached summary
-        const cached = summaries[profileHash];
-        const profile = cached.profile;
-        profile.aiSummary = cached.summary;
-        return profile;
-      }
-      
-      // Wait 3 seconds for profile to fully load before parsing
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Brief wait to ensure dynamic content is loaded
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Use the LinkedInScraper utility
       let profile;
@@ -2315,19 +2359,8 @@ ${profile.dom}`;
         }
       }
 
-      // Generate and store AI summary
-      const summary = await this.generateProfileSummary(profile);
-      if (summary) {
-        profile.aiSummary = summary;
-        // Store in chrome.storage for persistence
-        summaries[profileHash] = {
-          summary: summary,
-          profile: profile,
-          timestamp: new Date().toISOString()
-        };
-        await chrome.storage.local.set({ profile_summaries: summaries });
-      }
-
+      // Store profile without auto-generating summary
+      // Summary will only be generated when user explicitly requests it
       return profile;
     } catch (error) {
       console.error('Error scraping profile:', error);
@@ -2343,9 +2376,8 @@ ${profile.dom}`;
   async loadChatHistory() {
     // Load existing chat history for this profile
     const profileHash = this.hashProfile(window.location.href);
-    const results = await chrome.storage.local.get(['chats', 'profile_summaries']);
+    const results = await chrome.storage.local.get(['chats']);
     const chats = results.chats || {};
-    const summaries = results.profile_summaries || {};
     
     if (chats[profileHash] && chats[profileHash].messages.length > 0) {
       // Display existing chat messages
@@ -2353,27 +2385,8 @@ ${profile.dom}`;
       chat.messages.forEach(msg => {
         this.addMessage(msg.role, msg.content);
       });
-    } else if (summaries[profileHash] && summaries[profileHash].summary) {
-      // No chat history - show AI summary as first message
-      this.addMessage('assistant', summaries[profileHash].summary);
-      
-      // Save summary as first message in chat history
-      const timestamp = new Date().toISOString();
-      if (!chats[profileHash]) {
-        chats[profileHash] = {
-          profile: this.currentProfile,
-          messages: [],
-          lastActive: timestamp
-        };
-      }
-      chats[profileHash].messages.push({
-        id: `msg_${Date.now()}_ai_summary`,
-        role: 'assistant',
-        content: summaries[profileHash].summary,
-        timestamp
-      });
-      await chrome.storage.local.set({ chats });
     }
+    // AI summaries are no longer shown automatically - users must request them
   }
 
   hashProfile(url) {
