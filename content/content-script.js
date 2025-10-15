@@ -358,57 +358,89 @@ class LinkedInAI {
     }, 500);
   }
 
+  /**
+   * PRIMARY AI ACCESS METHOD - Injects the AI Premium section
+   * 
+   * WHY THIS IS THE PRIMARY METHOD:
+   * - More prominent and discoverable than the small AI button
+   * - Provides context about what the AI can do (summarize, draft messages, etc.)
+   * - Matches LinkedIn's native UI patterns
+   * - Better user experience with clear call-to-actions
+   * 
+   * PLACEMENT STRATEGY:
+   * - Appears right after the profile header (top card with photo/connect buttons)
+   * - Before main content sections (About, Experience, etc.)
+   * - Handles profiles with/without intermediate cards (Open to work, etc.)
+   */
   injectAIPremiumSection() {
-    // Check if section already exists
+    // Prevent duplicate injections
     if (document.getElementById('linkedin-ai-premium-section')) {
       console.log('LinkedIn AI: Premium section already exists');
       return;
     }
 
-    // Only inject on profile pages (not on company pages or other LinkedIn pages)
+    // Only show on individual profile pages (not company pages or feed)
+    // Regex matches: linkedin.com/in/username/ or linkedin.com/in/username
     if (!window.location.href.match(/linkedin\.com\/in\/[^/]+\/?$/)) {
       console.log('LinkedIn AI: Not a profile page, skipping premium section');
       return;
     }
 
-    // Extract the profile name
+    // Extract the profile owner's first name for personalization
     const profileName = this.extractProfileName();
     if (!profileName) {
       console.log('LinkedIn AI: Could not extract profile name, retrying in 2s...');
+      // Retry after DOM has more time to load
       setTimeout(() => this.injectAIPremiumSection(), 2000);
       return;
     }
 
-    // Find the insertion point - after the top card, before the first profile section
+    // Find where to insert the section - this is the tricky part
+    // Must be after top card but before main content, handling various LinkedIn layouts
     const insertionPoint = this.findPremiumSectionInsertionPoint();
     if (!insertionPoint) {
       console.log('LinkedIn AI: Could not find insertion point, retrying in 2s...');
+      // Retry in case LinkedIn is still loading sections
       setTimeout(() => this.injectAIPremiumSection(), 2000);
       return;
     }
 
-    // Create the premium section
+    // Create the premium section with the profile name
     const premiumSection = this.createAIPremiumSection(profileName);
     
-    // Insert the section
+    // Insert before the target section (so it appears above it)
     insertionPoint.parentNode.insertBefore(premiumSection, insertionPoint);
     
     console.log('LinkedIn AI: Premium section injected successfully!');
   }
 
+  /**
+   * Extract the profile owner's first name for personalization
+   * 
+   * WHY FIRST NAME ONLY:
+   * - More personal and friendly ("Ask anything about John" vs "Ask anything about John Smith")
+   * - Shorter text fits better in the UI
+   * - Matches common conversational patterns
+   * 
+   * SELECTOR STRATEGY:
+   * - Try multiple selectors as LinkedIn changes their DOM structure
+   * - Fallback from most specific to most general
+   * - Handle different LinkedIn UI variations
+   */
   extractProfileName() {
+    // LinkedIn uses different selectors for profile names across their UI variations
     const selectors = [
-      'h1.text-heading-xlarge',
-      'h1.inline.t-24.v-align-middle.break-words',
-      'h1.top-card-layout__title',
-      '.pv-top-card--list li:first-child'
+      'h1.text-heading-xlarge',           // Most common current selector
+      'h1.inline.t-24.v-align-middle.break-words',  // Older LinkedIn versions
+      'h1.top-card-layout__title',        // Alternative layout
+      '.pv-top-card--list li:first-child' // Fallback selector
     ];
 
     for (const selector of selectors) {
       const element = document.querySelector(selector);
       if (element) {
         const fullName = element.textContent.trim();
-        // Extract first name only
+        // Extract first name only for personalization
         const firstName = fullName.split(' ')[0];
         return firstName;
       }
@@ -417,26 +449,44 @@ class LinkedInAI {
     return '';
   }
 
+  /**
+   * CRITICAL FUNCTION: Find where to insert the AI Premium section
+   * 
+   * THE CHALLENGE:
+   * LinkedIn profiles have inconsistent layouts:
+   * - Some have just: [Top Card] → [About/Experience]
+   * - Others have: [Top Card] → [Open to work] → [Volunteer] → [About/Experience]
+   * - We need to insert AFTER the top card but BEFORE main content
+   * 
+   * STRATEGY:
+   * 1. Find the top card (profile photo + action buttons)
+   * 2. Look for the first substantial content section after it
+   * 3. Skip small intermediate cards (badges, "Open to work", etc.)
+   * 4. Use multiple fallback strategies for reliability
+   */
   findPremiumSectionInsertionPoint() {
-    // Find the first actual content section (Highlights, About, Activity, Experience, etc.)
-    // Skip top card and any intermediate cards (Open to work, volunteering, etc.)
+    // Get the main content area (where all profile sections live)
     const mainContent = document.querySelector('main.scaffold-layout__main') || 
                        document.querySelector('main');
     
     if (!mainContent) return null;
 
-    // Get all potential sections
+    // Get all potential sections that could be insertion points
+    // LinkedIn uses these selectors for profile sections
     const allSections = Array.from(mainContent.querySelectorAll('section.artdeco-card, div.pvs-list__outer-container'));
     
     if (allSections.length === 0) return null;
     
-    // Find the top card index (the section with profile photo and action buttons)
+    // STEP 1: Find the top card index
+    // The top card contains the profile photo, name, and Connect/Message buttons
     let topCardIndex = -1;
     for (let i = 0; i < allSections.length; i++) {
       const section = allSections[i];
       const classes = section.className || '';
       
-      // Top card has specific classes or contains Connect/Message buttons
+      // Top card identification criteria:
+      // - Has specific CSS classes
+      // - Contains action buttons (Connect, Message, Follow, "Open to")
       if (classes.includes('pv-top-card') || 
           classes.includes('top-card') ||
           section.querySelector('button[aria-label*="Connect"]') ||
@@ -448,15 +498,16 @@ class LinkedInAI {
       }
     }
     
-    // If we found the top card, look for sections after it
+    // STEP 2: Find first substantial content section after top card
     if (topCardIndex >= 0) {
-      // Look for the first substantial content section after the top card
+      // Look through sections that come after the top card
       for (let i = topCardIndex + 1; i < allSections.length; i++) {
         const section = allSections[i];
         const classes = section.className || '';
         const rect = section.getBoundingClientRect();
         
-        // Skip very small intermediate cards (like "Open to work" badges)
+        // Skip small intermediate cards (height < 80px)
+        // These are usually badges like "Open to work", volunteering, etc.
         if (rect.height < 80) {
           continue;
         }
@@ -466,12 +517,12 @@ class LinkedInAI {
           continue;
         }
         
-        // This is the first real content section
+        // Found the first real content section!
         return section;
       }
     }
     
-    // Fallback: Look for specific content sections by name/attribute
+    // STEP 3: Fallback strategies if index-based search fails
     const contentSectionSelectors = [
       'section[data-view-name="profile-card"]', // About section
       'section.pv-profile-card:not(.pv-top-card)', // Profile cards but not top card
@@ -485,7 +536,8 @@ class LinkedInAI {
       }
     }
 
-    // Last resort: If we have at least 2 sections, insert before the second one
+    // STEP 4: Last resort - insert before second section
+    // This handles edge cases where our logic doesn't work
     if (allSections.length >= 2) {
       return allSections[1];
     }
@@ -493,11 +545,28 @@ class LinkedInAI {
     return null;
   }
 
+  /**
+   * Create the AI Premium section HTML structure
+   * 
+   * DESIGN PHILOSOPHY:
+   * - Matches LinkedIn's native card design patterns
+   * - Dark theme to blend with LinkedIn's UI
+   * - Clear hierarchy: Logo → Title → Description → Actions
+   * - Interactive elements with hover states
+   * 
+   * STYLING DECISIONS:
+   * - Background: #1D1F21 (slightly lighter than LinkedIn's #1A2024)
+   * - Border: 1px solid rgba(255, 255, 255, 0.02) (subtle definition)
+   * - Border radius: 8px (matches LinkedIn's card radius)
+   * - Margin: 7px top (creates perfect spacing from profile card)
+   */
   createAIPremiumSection(profileName) {
     const section = document.createElement('div');
     section.id = 'linkedin-ai-premium-section';
     section.setAttribute('data-layer', 'profile section');
     section.className = 'ai-premium-section';
+    
+    // Inline styles for reliability (avoids CSS conflicts)
     section.style.cssText = `
       width: 100%;
       max-width: 804px;
@@ -552,31 +621,34 @@ class LinkedInAI {
       </div>
     `;
 
-    // Add event listeners for the Open AI button
+    // EVENT HANDLERS: Open AI Button (sparkle icon)
+    // This is the primary way users access the AI chat
     const openAIBtn = section.querySelector('#ai-premium-open-btn');
     if (openAIBtn) {
       openAIBtn.addEventListener('click', () => {
         if (!this.chatOpen) {
+          // Chat is closed - open it
           this.toggleChat();
         } else if (this.chatCollapsed) {
-          // If chat is collapsed, expand it
+          // Chat is collapsed - expand it
           this.toggleChatCollapse();
         }
+        // If chat is open and expanded, do nothing (already accessible)
       });
 
+      // Keyboard accessibility
       openAIBtn.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           if (!this.chatOpen) {
             this.toggleChat();
           } else if (this.chatCollapsed) {
-            // If chat is collapsed, expand it
             this.toggleChatCollapse();
           }
         }
       });
 
-      // Hover effect
+      // Visual feedback on hover
       openAIBtn.addEventListener('mouseenter', () => {
         openAIBtn.style.opacity = '0.8';
       });
@@ -585,31 +657,39 @@ class LinkedInAI {
       });
     }
 
-    // Add event listeners for action pills
+    // EVENT HANDLERS: Quick Action Pills
+    // These provide instant access to common AI tasks
     const actionPills = section.querySelectorAll('.ai-premium-action-pill');
     actionPills.forEach(pill => {
       const action = pill.getAttribute('data-action');
       
       pill.addEventListener('click', () => {
-        // Open chat if not already open
+        // SMART CHAT MANAGEMENT:
+        // - If chat is closed: open it, then trigger action
+        // - If chat is collapsed: expand it, then trigger action  
+        // - If chat is open: trigger action immediately
+        
         if (!this.chatOpen) {
+          // Chat is closed - open it first
           this.toggleChat().then(() => {
-            // Wait a bit for chat to open, then trigger the action
+            // Wait for chat to fully render before triggering action
             setTimeout(() => {
               this.triggerPremiumSectionAction(action);
             }, 300);
           });
         } else if (this.chatCollapsed) {
-          // If chat is collapsed, expand it first, then trigger the action
+          // Chat is collapsed - expand it first
           this.toggleChatCollapse();
           setTimeout(() => {
             this.triggerPremiumSectionAction(action);
           }, 150);
         } else {
+          // Chat is open and expanded - trigger action immediately
           this.triggerPremiumSectionAction(action);
         }
       });
 
+      // Keyboard accessibility (same logic as click)
       pill.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
@@ -620,7 +700,6 @@ class LinkedInAI {
               }, 300);
             });
           } else if (this.chatCollapsed) {
-            // If chat is collapsed, expand it first, then trigger the action
             this.toggleChatCollapse();
             setTimeout(() => {
               this.triggerPremiumSectionAction(action);
@@ -631,7 +710,8 @@ class LinkedInAI {
         }
       });
 
-      // Hover effect
+      // VISUAL FEEDBACK: Hover and active states
+      // Provides clear interaction feedback
       pill.addEventListener('mouseenter', () => {
         pill.style.background = 'rgba(255, 255, 255, 0.08)';
       });
@@ -639,7 +719,7 @@ class LinkedInAI {
         pill.style.background = 'transparent';
       });
 
-      // Active effect
+      // Active state (when pressed)
       pill.addEventListener('mousedown', () => {
         pill.style.background = 'rgba(255, 255, 255, 0.12)';
       });
@@ -651,8 +731,22 @@ class LinkedInAI {
     return section;
   }
 
+  /**
+   * Execute the selected quick action from the AI Premium section
+   * 
+   * HOW IT WORKS:
+   * 1. Maps the clicked action to a specific AI prompt
+   * 2. Uses the same handleQuickAction method as the chat interface
+   * 3. Provides consistent behavior across all AI access points
+   * 
+   * PROMPT DESIGN:
+   * - Each prompt is carefully crafted for the specific use case
+   * - Includes detailed instructions for consistent, high-quality output
+   * - Avoids generic responses by being specific about format and tone
+   */
   triggerPremiumSectionAction(action) {
-    // Map the action to the corresponding quick action with backend text
+    // ACTION MAPPING: Each pill maps to a specific AI task
+    // The backendText contains detailed instructions for the AI
     const actionMap = {
       'Summarize': {
         displayText: 'Summarize',
@@ -691,6 +785,8 @@ Clean, simple sentence about how to improve my profile for this person
       }
     };
 
+    // Execute the action using the same method as chat quick actions
+    // This ensures consistent behavior and UI updates
     const actionConfig = actionMap[action];
     if (actionConfig) {
       this.handleQuickAction(actionConfig.displayText, actionConfig.backendText);
