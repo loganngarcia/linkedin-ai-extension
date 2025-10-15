@@ -2,7 +2,7 @@
 
 ## 🎉 Implementation Complete!
 
-A fully functional Chrome extension that adds AI-powered chat to LinkedIn profiles using Google's Gemini 2.0 Flash model.
+A fully functional Chrome extension that adds AI-powered chat to LinkedIn profiles using Google's Gemini 2.5 Flash Lite Preview model.
 
 ## 🆕 Latest Updates (v1.0.0)
 
@@ -49,7 +49,7 @@ linkedin-ai-extension/
 - ✅ **AI Button Injection** - Adds "AI" button to LinkedIn profiles
 - ✅ **Chat Interface** - Full-featured chat popup (500x700px)
 - ✅ **Profile Scraping** - Extracts name, headline, experience, education, skills
-- ✅ **Gemini Integration** - Uses Gemini 2.0 Flash API for responses
+- ✅ **Gemini Integration** - Uses Gemini 2.5 Flash Lite Preview API for responses
 - ✅ **Context Awareness** - AI understands profile context
 - ✅ **Chat Persistence** - Saves conversations per profile
 - ✅ **Profile Switching** - Auto-updates context on navigation
@@ -116,7 +116,7 @@ linkedin-ai-extension/
 - **Manifest Version:** V3
 - **JavaScript:** Vanilla JS (ES6+)
 - **CSS:** Custom (system-ui font)
-- **API:** Google Gemini 2.0 Flash
+- **API:** Google Gemini 2.5 Flash Lite Preview
 - **Storage:** Chrome Storage API
 - **Permissions:** storage, activeTab, scripting
 
@@ -275,7 +275,7 @@ The extension is complete and ready for:
 
 ---
 
-**Built with ❤️ using Google Gemini 2.0 Flash**
+**Built with ❤️ using Google Gemini 2.5 Flash Lite Preview**
 
 *Last Updated: October 13, 2025*
 

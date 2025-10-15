@@ -1,6 +1,6 @@
 # LinkedIn AI Premium Extension
 
-An AI-powered chat assistant for LinkedIn profiles using Google's Gemini 2.0 Flash model.
+An AI-powered chat assistant for LinkedIn profiles using Google's Gemini 2.5 Flash Lite Preview model.
 
 ## Features
 
@@ -61,7 +61,7 @@ Access API key settings by clicking the **three-dots menu (⋯)** in the chat he
 ## Technical Details
 
 - **Manifest Version:** V3
-- **AI Model:** Gemini 2.0 Flash
+- **AI Model:** Gemini 2.5 Flash Lite Preview
 - **Storage:** Chrome Storage API (sync + local)
 - **Permissions:** `storage`, `activeTab`, `scripting`
 
@@ -118,7 +118,7 @@ linkedin-ai-extension/
 
 ## Credits
 
-- Built with Google Gemini 2.0 Flash
+- Built with Google Gemini 2.5 Flash Lite Preview
 - UI inspired by LinkedIn's design system
 - Icons from system fonts
 

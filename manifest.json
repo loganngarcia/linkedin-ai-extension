@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LinkedIn AI Premium",
   "version": "1.0.0",
-  "description": "AI-powered chat assistant for LinkedIn profiles using Gemini",
+  "description": "AI-powered chat assistant for LinkedIn profiles using Gemini 2.5 Flash Lite Preview",
   "permissions": [
     "storage",
     "activeTab",

@@ -1,7 +1,7 @@
 {
   "name": "linkedin-ai-premium",
   "version": "1.0.0",
-  "description": "AI-powered chat assistant for LinkedIn profiles using Google Gemini",
+  "description": "AI-powered chat assistant for LinkedIn profiles using Google Gemini 2.5 Flash Lite Preview",
   "author": "Your Name",
   "license": "MIT",
   "private": true,

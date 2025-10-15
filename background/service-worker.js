@@ -16,6 +16,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => sendResponse({ error: error.message }));
     return true;
   }
+  
+  if (request.action === 'openPopup') {
+    // Open the extension popup
+    chrome.action.openPopup();
+    sendResponse({ success: true });
+    return true;
+  }
 });
 
 async function handleGeminiRequest(apiKey, message) {
@@ -30,7 +37,7 @@ async function handleGeminiRequest(apiKey, message) {
         body: JSON.stringify({
           systemInstruction: {
             parts: [{
-              text: "You are LinkedIn AI Premium, a helpful assistant. Answer questions directly and concisely. Always bold important (numbers, places, and highly relevant information) throughout everything you say."
+              text: "You are LinkedIn AI Premium, a helpful assistant. Answer questions directly, concisely, precisely, and accurately. Get straight to the point. Always bold important facts (numbers, places, and highly relevant information) throughout everything you say."
             }]
           },
           contents: [{
@@ -76,7 +83,7 @@ async function handleGeminiStreamRequest(apiKey, message, tabId) {
         body: JSON.stringify({
           systemInstruction: {
             parts: [{
-              text: "You are LinkedIn AI Premium, a helpful assistant. Answer questions directly using both the provided profile information and your general knowledge. For follow-up questions, build on previous conversation context. Always bold important facts (numbers, places, and highly relevant information) throughout everything you say. Don't repeat introductions or information already mentioned unless asked."
+              text: "You are LinkedIn AI Premium, a helpful assistant. Answer questions directly using both the provided profile information and your general knowledge. Never use phrases like 'We've previously established', 'Since [person] is...', 'While the specific details are still being loaded', 'we can infer', or similar verbose transitions. Get straight to the point without unnecessary preambles. Always bold important facts (numbers, places, and highly relevant information) throughout everything you say. Don't repeat introductions or information already mentioned unless asked."
             }]
           },
           contents: [{

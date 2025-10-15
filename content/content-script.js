@@ -53,6 +53,108 @@ function stripMarkdown(text) {
   return stripped.trim();
 }
 
+/**
+ * Convert HTML content to a PNG image blob using SVG foreignObject and Canvas
+ * 
+ * WHY THIS APPROACH:
+ * - We need to convert HTML (with CSS styling) to an image for sharing
+ * - Canvas alone can't render complex HTML/CSS (like flexbox, custom fonts)
+ * - SVG foreignObject allows embedding HTML within SVG, which Canvas can render
+ * - Data URLs avoid CORS issues that would "taint" the canvas
+ * 
+ * HOW IT WORKS:
+ * 1. Wrap HTML in SVG foreignObject for proper CSS rendering
+ * 2. Encode as data URL to avoid external resource loading issues
+ * 3. Load SVG as Image object (browser renders the HTML/CSS)
+ * 4. Draw Image onto Canvas (converts to raster)
+ * 5. Export Canvas as PNG blob for sharing
+ */
+async function htmlToImage(htmlContent) {
+  return new Promise((resolve, reject) => {
+    try {
+      console.log('Starting HTML to image conversion...');
+      
+      // Create SVG wrapper with foreignObject to render HTML/CSS properly
+      // foreignObject allows embedding HTML/DOM elements within SVG
+      // This is crucial for rendering complex CSS like flexbox, custom fonts, etc.
+      const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="320" height="480">
+          <foreignObject width="320" height="480">
+            <div xmlns="http://www.w3.org/1999/xhtml" style="width: 320px; height: 480px; margin: 0; padding: 0;">
+              ${htmlContent}
+            </div>
+          </foreignObject>
+        </svg>
+      `;
+      
+      console.log('SVG created, encoding as data URL...');
+      
+      // Create Image object to load the SVG
+      // Using data URL instead of blob URL to avoid CORS/taint issues
+      const img = new Image();
+      
+      // Add timeout to detect if SVG foreignObject isn't supported
+      // Some browsers/contexts may not support foreignObject rendering
+      const timeout = setTimeout(() => {
+        reject(new Error('Image load timeout - SVG foreignObject may not be supported'));
+      }, 5000);
+      
+      // Success handler: SVG loaded and rendered successfully
+      img.onload = () => {
+        clearTimeout(timeout);
+        console.log('SVG image loaded successfully');
+        
+        // Create canvas to convert the rendered SVG to raster image
+        const canvas = document.createElement('canvas');
+        canvas.width = 320;  // Fixed width for share sheet
+        canvas.height = 480; // Fixed height for share sheet
+        const ctx = canvas.getContext('2d', { willReadFrequently: false });
+        
+        // Draw white background first (SVG might have transparent areas)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 320, 480);
+        
+        // Draw the rendered SVG image onto canvas
+        // This converts the vector SVG to raster PNG
+        ctx.drawImage(img, 0, 0, 320, 480);
+        
+        console.log('Canvas created, converting to blob...');
+        
+        // Convert canvas to PNG blob for sharing
+        // Quality 0.95 provides good compression while maintaining quality
+        canvas.toBlob((blob) => {
+          if (blob) {
+            console.log('Blob created successfully:', blob.size, 'bytes');
+            resolve(blob);
+          } else {
+            reject(new Error('Failed to create blob from canvas'));
+          }
+        }, 'image/png', 0.95);
+      };
+      
+      // Error handler: SVG failed to load (foreignObject not supported, etc.)
+      img.onerror = (error) => {
+        clearTimeout(timeout);
+        console.error('SVG image load error:', error);
+        reject(new Error('Failed to load SVG image: ' + error));
+      };
+      
+      // Set crossOrigin to prevent canvas tainting
+      // This ensures the canvas can be exported as blob
+      img.crossOrigin = 'anonymous';
+      
+      // Encode SVG as data URL to avoid external resource loading
+      // Data URLs are treated as same-origin, preventing CORS issues
+      const svgData = encodeURIComponent(svg);
+      img.src = 'data:image/svg+xml;charset=utf-8,' + svgData;
+      
+    } catch (error) {
+      console.error('htmlToImage error:', error);
+      reject(error);
+    }
+  });
+}
+
 // Simple markdown parser (no external dependencies)
 // Supports: headers, bold, italic, code blocks, inline code, links, lists, blockquotes, hr, tables
 function parseMarkdown(text) {
@@ -140,6 +242,14 @@ class LinkedInAI {
     this.currentProfile = null;
     this.streamingMessageId = null;
     this.messageCount = 0; // Track if this is first message
+    this.currentAudio = null;
+    this.currentUtterance = null;
+    this.currentTTSMessageId = null;
+    // Store last user message for share sheet functionality
+    // This allows us to include the user's question in the shared image
+    this.lastUserMessage = null;
+    // Track clicked quick actions to avoid suggesting them again
+    this.clickedActions = new Set();
     this.init();
     this.setupMessageListener();
   }
@@ -150,6 +260,14 @@ class LinkedInAI {
       if (request.type === 'GEMINI_STREAM_CHUNK') {
         this.handleStreamChunk(request.fullText);
       }
+      
+      if (request.type === 'GEMINI_TTS_AUDIO') {
+        this.handleTTSAudio(request.audioData, request.text);
+      }
+      
+      if (request.type === 'GEMINI_TTS_AUDIO_URL') {
+        this.handleTTSAudioURL(request.audioUrl, request.text);
+      }
     });
   }
 
@@ -157,11 +275,405 @@ class LinkedInAI {
     // Wait for LinkedIn to load
     await this.waitForLinkedInLoad();
     
-    // Inject AI button
+    // Inject the AI button
     this.injectAIButton();
+    
+    // Inject the AI Premium section
+    this.injectAIPremiumSection();
     
     // Listen for profile changes
     this.observeProfileChanges();
+  }
+
+  injectAIButton() {
+    // Check for any existing button (with or without wrapper)
+    const existingButton = document.getElementById('linkedin-ai-button');
+    if (existingButton && existingButton.isConnected) {
+      console.log('LinkedIn AI: Button already exists and is connected');
+      return;
+    }
+
+    const profileActions = this.findProfileActionsContainer();
+    if (!profileActions) {
+      console.log('LinkedIn AI: Could not find profile actions container, retrying in 2s...');
+      setTimeout(() => this.injectAIButton(), 2000);
+      return;
+    }
+
+    const aiButton = this.createAIButton();
+    
+    // DON'T use a wrapper - inject the button directly like LinkedIn's native buttons
+    aiButton.style.cssText = `
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      margin: 0 4px !important;
+      flex-shrink: 0 !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      z-index: 999999 !important;
+      position: relative !important;
+    `;
+    
+    // Find the last button in the container to insert after it
+    const lastButton = Array.from(profileActions.children).filter(el => el.tagName === 'BUTTON').pop();
+    
+    if (lastButton) {
+      console.log('LinkedIn AI: Inserting after last button:', lastButton);
+      lastButton.parentNode.insertBefore(aiButton, lastButton.nextSibling);
+    } else {
+      console.log('LinkedIn AI: Appending to container');
+      profileActions.appendChild(aiButton);
+    }
+    
+    console.log('LinkedIn AI: Button injected successfully!');
+    console.log('LinkedIn AI: Button element:', aiButton);
+    console.log('LinkedIn AI: Parent container:', profileActions);
+    
+    // Check if it's actually visible
+    setTimeout(() => {
+      const btn = document.getElementById('linkedin-ai-button');
+      if (btn) {
+        const rect = btn.getBoundingClientRect();
+        const styles = window.getComputedStyle(btn);
+        console.log('LinkedIn AI: ✓ Button visibility check:', {
+          visible: rect.width > 0 && rect.height > 0,
+          display: styles.display,
+          visibility: styles.visibility,
+          opacity: styles.opacity,
+          width: rect.width + 'px',
+          height: rect.height + 'px',
+          top: rect.top + 'px',
+          left: rect.left + 'px'
+        });
+        
+        // Make it flash red briefly so user can see it
+        btn.style.background = 'red !important';
+        setTimeout(() => {
+          btn.style.background = 'transparent !important';
+        }, 1000);
+      } else {
+        console.error('LinkedIn AI: ✗ Button not found in DOM after injection!');
+      }
+    }, 500);
+  }
+
+  injectAIPremiumSection() {
+    // Check if section already exists
+    if (document.getElementById('linkedin-ai-premium-section')) {
+      console.log('LinkedIn AI: Premium section already exists');
+      return;
+    }
+
+    // Only inject on profile pages (not on company pages or other LinkedIn pages)
+    if (!window.location.href.match(/linkedin\.com\/in\/[^/]+\/?$/)) {
+      console.log('LinkedIn AI: Not a profile page, skipping premium section');
+      return;
+    }
+
+    // Extract the profile name
+    const profileName = this.extractProfileName();
+    if (!profileName) {
+      console.log('LinkedIn AI: Could not extract profile name, retrying in 2s...');
+      setTimeout(() => this.injectAIPremiumSection(), 2000);
+      return;
+    }
+
+    // Find the insertion point - after the top card, before the first profile section
+    const insertionPoint = this.findPremiumSectionInsertionPoint();
+    if (!insertionPoint) {
+      console.log('LinkedIn AI: Could not find insertion point, retrying in 2s...');
+      setTimeout(() => this.injectAIPremiumSection(), 2000);
+      return;
+    }
+
+    // Create the premium section
+    const premiumSection = this.createAIPremiumSection(profileName);
+    
+    // Insert the section
+    insertionPoint.parentNode.insertBefore(premiumSection, insertionPoint);
+    
+    console.log('LinkedIn AI: Premium section injected successfully!');
+  }
+
+  extractProfileName() {
+    const selectors = [
+      'h1.text-heading-xlarge',
+      'h1.inline.t-24.v-align-middle.break-words',
+      'h1.top-card-layout__title',
+      '.pv-top-card--list li:first-child'
+    ];
+
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        const fullName = element.textContent.trim();
+        // Extract first name only
+        const firstName = fullName.split(' ')[0];
+        return firstName;
+      }
+    }
+
+    return '';
+  }
+
+  findPremiumSectionInsertionPoint() {
+    // Try to find the first profile section AFTER the top card
+    // (Highlights, About, Activity, Experience, etc.)
+    const mainContent = document.querySelector('main.scaffold-layout__main') || 
+                       document.querySelector('main');
+    
+    if (!mainContent) return null;
+
+    // Strategy: Find all sections and skip the first one (which is the top card with profile pic)
+    // LinkedIn profile sections typically use these selectors:
+    const allSections = mainContent.querySelectorAll('section.artdeco-card, div.pvs-list__outer-container, section[data-view-name]');
+    
+    // Skip the first section (top card) and return the second one
+    // The second section is typically Highlights, About, or Activity
+    if (allSections.length >= 2) {
+      return allSections[1];
+    }
+    
+    // Fallback: if only one section found, it might be structured differently
+    // Try to find by looking for sections with specific IDs or attributes
+    const fallbackSelectors = [
+      'section[id*="highlights"]',
+      'section[id*="about"]',
+      'section[id*="activity"]',
+      'div.pvs-list__outer-container'
+    ];
+    
+    for (const selector of fallbackSelectors) {
+      const section = mainContent.querySelector(selector);
+      if (section) {
+        return section;
+      }
+    }
+
+    // Last resort: return the first section if we can't find anything better
+    if (allSections.length >= 1) {
+      return allSections[0];
+    }
+
+    return null;
+  }
+
+  createAIPremiumSection(profileName) {
+    const section = document.createElement('div');
+    section.id = 'linkedin-ai-premium-section';
+    section.setAttribute('data-layer', 'profile section');
+    section.className = 'ai-premium-section';
+    section.style.cssText = `
+      width: 100%;
+      max-width: 804px;
+      padding: 24px;
+      background: #1D1F21;
+      overflow: hidden;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.02);
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: flex-start;
+      gap: 16px;
+      display: inline-flex;
+      margin-top: 7px;
+      margin-bottom: 0px;
+      box-sizing: border-box;
+    `;
+
+    // Create inner structure
+    section.innerHTML = `
+      <div data-layer="flexbox" class="ai-premium-content" style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 12px; display: flex;">
+        <div data-layer="flexbox" class="ai-premium-header" style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 8px; display: flex;">
+          <div data-svg-wrapper data-layer="ai premium logo" class="ai-premium-logo">
+            <svg width="79" height="8" viewBox="0 0 79 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <g opacity="0.9">
+                <path d="M8.04633 7.56C8.32771 7.27897 8.48598 6.89769 8.48633 6.5V1.5C8.48633 1.10218 8.32829 0.720644 8.04699 0.43934C7.76568 0.158035 7.38415 0 6.98633 0H1.98633C1.58864 0.000350104 1.20736 0.158615 0.926328 0.44L8.04633 7.56Z" fill="#F8C77E"/>
+                <path d="M0.926328 0.44C0.644943 0.721035 0.486678 1.10231 0.486328 1.5V6.5C0.486328 6.89782 0.644363 7.27936 0.925668 7.56066C1.20697 7.84196 1.5885 8 1.98633 8H6.98633C7.38402 7.99965 7.76529 7.84138 8.04633 7.56L0.926328 0.44Z" fill="#E7A33E"/>
+                <path d="M17.1913 0.1H14.4863V7.9H15.9363V5.16H17.1713C18.9313 5.16 19.8563 4.01 19.8563 2.62C19.8563 1.23 18.9863 0.1 17.1913 0.1ZM16.9863 3.935H15.9363V1.335H16.9863C17.3092 1.28934 17.637 1.37378 17.8977 1.56973C18.1583 1.76569 18.3305 2.05714 18.3763 2.38C18.3838 2.46317 18.3838 2.54683 18.3763 2.63C18.3858 2.79355 18.3629 2.95737 18.3089 3.11205C18.2549 3.26673 18.1709 3.40923 18.0618 3.53139C17.9526 3.65356 17.8204 3.75298 17.6728 3.82395C17.5251 3.89493 17.3649 3.93606 17.2013 3.945C17.1295 3.94622 17.0577 3.94288 16.9863 3.935ZM29.1113 2.435C29.1113 1.105 28.1613 0.1 26.5163 0.1H23.4863V7.9H24.9313V4.8H26.0663L27.8963 7.9H29.5463L27.5463 4.59C28.012 4.45893 28.4207 4.17636 28.7077 3.78697C28.9948 3.39758 29.1439 2.9236 29.1313 2.44L29.1113 2.435ZM26.3563 3.61H24.9313V1.335H26.3013C27.1263 1.335 27.6413 1.76 27.6413 2.475C27.6413 3.19 27.1813 3.61 26.3563 3.61ZM33.1763 0.1H38.9013V1.35H34.6213V3.31H37.3413V4.545H34.6213V6.65H38.9013V7.9H33.1763V0.1ZM48.4463 0.1H50.4463V7.9H48.9863V1.9L47.2163 5.77H45.9163L44.1563 1.925V7.925H42.7413V0.1H44.8563L46.5963 4.125L48.4463 0.1ZM54.8063 0.1H56.2513V7.9H54.8063V0.1ZM65.0463 0.1H66.4863V5.5C66.4863 6.9 65.4863 8 63.5263 8C61.5663 8 60.5613 6.895 60.5613 5.5V0.1H61.9863V5.395C61.9863 6.105 62.4313 6.73 63.4863 6.73C64.5413 6.73 65.0213 6.105 65.0213 5.395L65.0463 0.1ZM78.4863 0.1V7.9H77.0363V1.9L75.2663 5.77H73.9313L72.1713 1.9V7.9H70.7563V0.1H72.8713L74.6113 4.125L76.4563 0.125L78.4863 0.1Z" fill="white"/>
+              </g>
+            </svg>
+          </div>
+          <div data-layer="Ask anything about [name]" class="ai-premium-title" style="align-self: stretch; color: rgba(255, 255, 255, 0.95); font-size: 20px; font-family: 'SF Pro', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-weight: 600; line-height: 20px; word-wrap: break-word;">Ask anything about ${profileName}</div>
+        </div>
+        <div data-layer="description" class="ai-premium-description" style="align-self: stretch; justify-content: center; display: flex; flex-direction: column; color: rgba(255, 255, 255, 0.95); font-size: 14px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-weight: 400; line-height: 14px; word-wrap: break-word;">I'd be great to connect, based on your skills, experience, and chances of hearing back</div>
+      </div>
+      <div data-layer="flexbox" class="ai-premium-actions" style="align-self: stretch; justify-content: flex-start; align-items: flex-start; gap: 8px; display: inline-flex; flex-wrap: wrap;">
+        <div data-svg-wrapper data-layer="open ai" class="ai-premium-open-btn" id="ai-premium-open-btn" style="cursor: pointer;" role="button" tabindex="0" aria-label="Open AI Premium chat">
+          <svg width="33" height="32" viewBox="0 0 33 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0.986328" y="0.5" width="31" height="31" rx="15.5" stroke="white" stroke-opacity="0.75"/>
+            <path d="M23.4863 15.99C23.4863 16.38 23.2065 16.69 22.8368 16.73C19.8989 17.05 17.5506 19.41 17.2208 22.35C17.1808 22.72 16.8611 23 16.4913 23H16.4813C16.1116 23 15.7918 22.72 15.7519 22.35C15.4321 19.41 13.0738 17.06 10.1359 16.73C9.957 16.7092 9.79201 16.6233 9.67226 16.4887C9.55252 16.3541 9.48634 16.1802 9.48633 16C9.48633 15.61 9.76613 15.3 10.1359 15.26C13.0738 14.94 15.4221 12.58 15.7419 9.65C15.7818 9.28 16.1016 9 16.4713 9H16.4913C16.8611 9 17.1808 9.28 17.2208 9.65C17.5406 12.59 19.8989 14.94 22.8368 15.27C23.2065 15.31 23.4863 15.63 23.4863 16V15.99Z" fill="#F19F22"/>
+          </svg>
+        </div>
+        <div data-layer="summarize" class="ai-premium-action-pill" data-action="Summarize" style="height: 32px; padding-left: 16px; padding-right: 16px; padding-top: 10px; padding-bottom: 10px; overflow: hidden; border-radius: 50px; outline: 1px rgba(255, 255, 255, 0.75) solid; outline-offset: -1px; justify-content: center; align-items: center; gap: 4px; display: flex; cursor: pointer; transition: all 150ms ease;" role="button" tabindex="0" aria-label="Summarize">
+          <div data-layer="Summarize" style="color: rgba(255, 255, 255, 0.75); font-size: 16px; font-family: 'SF Pro', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-weight: 590; word-wrap: break-word;">Summarize</div>
+        </div>
+        <div data-layer="draft messages" class="ai-premium-action-pill" data-action="Draft messages" style="height: 32px; padding-left: 16px; padding-right: 16px; padding-top: 10px; padding-bottom: 10px; overflow: hidden; border-radius: 50px; outline: 1px rgba(255, 255, 255, 0.75) solid; outline-offset: -1px; justify-content: center; align-items: center; gap: 4px; display: flex; cursor: pointer; transition: all 150ms ease;" role="button" tabindex="0" aria-label="Draft messages">
+          <div data-layer="Draft messages" style="color: rgba(255, 255, 255, 0.75); font-size: 16px; font-family: 'SF Pro', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-weight: 590; word-wrap: break-word;">Draft messages</div>
+        </div>
+        <div data-layer="improve my profile" class="ai-premium-action-pill" data-action="Improve my profile" style="height: 32px; padding-left: 16px; padding-right: 16px; padding-top: 10px; padding-bottom: 10px; overflow: hidden; border-radius: 50px; outline: 1px rgba(255, 255, 255, 0.75) solid; outline-offset: -1px; justify-content: center; align-items: center; gap: 4px; display: flex; cursor: pointer; transition: all 150ms ease;" role="button" tabindex="0" aria-label="Improve my profile">
+          <div data-layer="Improve my profile" style="color: rgba(255, 255, 255, 0.75); font-size: 16px; font-family: 'SF Pro', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-weight: 590; word-wrap: break-word;">Improve my profile</div>
+        </div>
+      </div>
+    `;
+
+    // Add event listeners for the Open AI button
+    const openAIBtn = section.querySelector('#ai-premium-open-btn');
+    if (openAIBtn) {
+      openAIBtn.addEventListener('click', () => {
+        if (!this.chatOpen) {
+          this.toggleChat();
+        }
+      });
+
+      openAIBtn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (!this.chatOpen) {
+            this.toggleChat();
+          }
+        }
+      });
+
+      // Hover effect
+      openAIBtn.addEventListener('mouseenter', () => {
+        openAIBtn.style.opacity = '0.8';
+      });
+      openAIBtn.addEventListener('mouseleave', () => {
+        openAIBtn.style.opacity = '1';
+      });
+    }
+
+    // Add event listeners for action pills
+    const actionPills = section.querySelectorAll('.ai-premium-action-pill');
+    actionPills.forEach(pill => {
+      const action = pill.getAttribute('data-action');
+      
+      pill.addEventListener('click', () => {
+        // Open chat if not already open
+        if (!this.chatOpen) {
+          this.toggleChat().then(() => {
+            // Wait a bit for chat to open, then trigger the action
+            setTimeout(() => {
+              this.triggerPremiumSectionAction(action);
+            }, 300);
+          });
+        } else {
+          this.triggerPremiumSectionAction(action);
+        }
+      });
+
+      pill.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (!this.chatOpen) {
+            this.toggleChat().then(() => {
+              setTimeout(() => {
+                this.triggerPremiumSectionAction(action);
+              }, 300);
+            });
+          } else {
+            this.triggerPremiumSectionAction(action);
+          }
+        }
+      });
+
+      // Hover effect
+      pill.addEventListener('mouseenter', () => {
+        pill.style.background = 'rgba(255, 255, 255, 0.08)';
+      });
+      pill.addEventListener('mouseleave', () => {
+        pill.style.background = 'transparent';
+      });
+
+      // Active effect
+      pill.addEventListener('mousedown', () => {
+        pill.style.background = 'rgba(255, 255, 255, 0.12)';
+      });
+      pill.addEventListener('mouseup', () => {
+        pill.style.background = 'rgba(255, 255, 255, 0.08)';
+      });
+    });
+
+    return section;
+  }
+
+  triggerPremiumSectionAction(action) {
+    // Map the action to the corresponding quick action with backend text
+    const actionMap = {
+      'Summarize': {
+        displayText: 'Summarize',
+        backendText: "Analyze this LinkedIn profile and create a concise, professional summary. Focus on key achievements, skills, work experience, education, and hobbies, and interests. Keep it under 200 words and make it easy to understand. Be specific and highlight what makes this person unique. No jargon, people use in everyday conversation."
+      },
+      'Draft messages': {
+        displayText: 'Draft messages',
+        backendText: `Output ONLY message drafts, nothing else. Rules:
+
+- Always start with 'Hi'
+- Absolutely max 300 characters
+- Sentence 1: Something specific about their exact role/team or congrats based on their profile. If they started as an intern → mention it. If they just got promoted → say congrats.
+- Sentence 2: Always mention the SPECIFIC role I just applied for (include exact job title AND company name)
+- Sentence 3: ABSOLUTELY ONLY if they are a recruiter or hiring manager, briefly mention my relevant background and role number in parenthesis after job title I applied for.
+- Final sentence: Always end with a polite request for a brief call ('to hear about your experience and your team's focus' / 'to learn more about the team's priorities').
+- Tone: warm, professional, not forced. Avoid sounding robotic.
+- ABSOLUTELY avoid words like: stood out, inspiring, impressive, unique, bridging, advancing, journey, takeaways, and other buzzwords that feel fake/cringe/impersonal/robotic. Use mom-talk, what matters to customers, no consultant-ese.
+- IMPORTANT: Only reference their posts/comments if they're substantial (career moves, insights, achievements). Never reference trivial comments like 'congrats' on random posts - that's spammy and irrelevant.
+- NEVER mention LinkedIn Premium, badges, or other LinkedIn features - that's weird and awkward.
+- Be specific about job titles and companies - never say vague things like 'the role' without context.
+
+Generate 3 variations personalized based on the person's role and posts.`
+      },
+      'Improve my profile': {
+        displayText: 'Improve my profile',
+        backendText: `Look at my profile and this person's profile and suggest 3-5 ways I could make my profile more authentic and human. Focus on showing my personality, interests, and what I'm passionate about - not just my job title. Help me come across as someone people would want to have a conversation with, not just work with.
+
+ONLY OUTPUT THIS EXACT FORMAT AND NOTHING ELSE:
+Clean, simple sentence about how to improve my profile for this person
+
+• [Direct, actionable improvement suggestion]
+• [Direct, actionable improvement suggestion]
+• [Direct, actionable improvement suggestion]
+• [Direct, actionable improvement suggestion]
+• [Direct, actionable improvement suggestion]`
+      }
+    };
+
+    const actionConfig = actionMap[action];
+    if (actionConfig) {
+      this.handleQuickAction(actionConfig.displayText, actionConfig.backendText);
+    }
+  }
+
+  createAIButton() {
+    const button = document.createElement('button');
+    button.id = 'linkedin-ai-button';
+    button.className = 'linkedin-ai-button';
+    button.setAttribute('aria-label', 'Open AI Premium chat assistant');
+    button.setAttribute('title', 'AI Premium - Ask questions about this profile');
+    button.setAttribute('role', 'button');
+    button.setAttribute('tabindex', '0');
+    button.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M14 6.99C14 7.38 13.7202 7.69 13.3505 7.73C10.4126 8.05 8.06424 10.41 7.73448 13.35C7.6945 13.72 7.37473 14 7.005 14H6.995C6.62527 14 6.3055 13.72 6.26553 13.35C5.94575 10.41 3.58744 8.06 0.649536 7.73C0.470669 7.70916 0.305686 7.62329 0.185936 7.48871C0.0661869 7.35412 1.67801e-05 7.1802 0 7C0 6.61 0.2798 6.3 0.649536 6.26C3.58744 5.94 5.93576 3.58 6.25553 0.65C6.2955 0.28 6.61527 0 6.98501 0H7.005C7.37473 0 7.6945 0.28 7.73448 0.65C8.05425 3.59 10.4126 5.94 13.3505 6.27C13.7202 6.31 14 6.63 14 7V6.99Z" fill="#71B7FB"/>
+      </svg>
+      <span>AI</span>
+    `;
+
+    button.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.toggleChat();
+    });
+
+    button.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.toggleChat();
+      }
+    });
+
+    return button;
   }
 
   waitForLinkedInLoad() {
@@ -273,109 +785,7 @@ class LinkedInAI {
     return null;
   }
 
-  injectAIButton() {
-    // Check for any existing button (with or without wrapper)
-    const existingButton = document.getElementById('linkedin-ai-button');
-    if (existingButton && existingButton.isConnected) {
-      console.log('LinkedIn AI: Button already exists and is connected');
-      return;
-    }
 
-    const profileActions = this.findProfileActionsContainer();
-    if (!profileActions) {
-      console.log('LinkedIn AI: Could not find profile actions container, retrying in 2s...');
-      setTimeout(() => this.injectAIButton(), 2000);
-      return;
-    }
-
-    const aiButton = this.createAIButton();
-    
-    // DON'T use a wrapper - inject the button directly like LinkedIn's native buttons
-    aiButton.style.cssText = `
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      margin: 0 4px !important;
-      flex-shrink: 0 !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-      z-index: 999999 !important;
-      position: relative !important;
-    `;
-    
-    // Find the last button in the container to insert after it
-    const lastButton = Array.from(profileActions.children).filter(el => el.tagName === 'BUTTON').pop();
-    
-    if (lastButton) {
-      console.log('LinkedIn AI: Inserting after last button:', lastButton);
-      lastButton.parentNode.insertBefore(aiButton, lastButton.nextSibling);
-    } else {
-      console.log('LinkedIn AI: Appending to container');
-      profileActions.appendChild(aiButton);
-    }
-    
-    console.log('LinkedIn AI: Button injected successfully!');
-    console.log('LinkedIn AI: Button element:', aiButton);
-    console.log('LinkedIn AI: Parent container:', profileActions);
-    
-    // Check if it's actually visible
-    setTimeout(() => {
-      const btn = document.getElementById('linkedin-ai-button');
-      if (btn) {
-        const rect = btn.getBoundingClientRect();
-        const styles = window.getComputedStyle(btn);
-        console.log('LinkedIn AI: ✓ Button visibility check:', {
-          visible: rect.width > 0 && rect.height > 0,
-          display: styles.display,
-          visibility: styles.visibility,
-          opacity: styles.opacity,
-          width: rect.width + 'px',
-          height: rect.height + 'px',
-          top: rect.top + 'px',
-          left: rect.left + 'px'
-        });
-        
-        // Make it flash red briefly so user can see it
-        btn.style.background = 'red !important';
-        setTimeout(() => {
-          btn.style.background = 'transparent !important';
-        }, 1000);
-      } else {
-        console.error('LinkedIn AI: ✗ Button not found in DOM after injection!');
-      }
-    }, 500);
-  }
-
-  createAIButton() {
-    const button = document.createElement('button');
-    button.id = 'linkedin-ai-button';
-    button.className = 'linkedin-ai-button';
-    button.setAttribute('aria-label', 'Open AI Premium chat assistant');
-    button.setAttribute('title', 'AI Premium - Ask questions about this profile');
-    button.setAttribute('role', 'button');
-    button.setAttribute('tabindex', '0');
-    button.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M14 6.99C14 7.38 13.7202 7.69 13.3505 7.73C10.4126 8.05 8.06424 10.41 7.73448 13.35C7.6945 13.72 7.37473 14 7.005 14H6.995C6.62527 14 6.3055 13.72 6.26553 13.35C5.94575 10.41 3.58744 8.06 0.649536 7.73C0.470669 7.70916 0.305686 7.62329 0.185936 7.48871C0.0661869 7.35412 1.67801e-05 7.1802 0 7C0 6.61 0.2798 6.3 0.649536 6.26C3.58744 5.94 5.93576 3.58 6.25553 0.65C6.2955 0.28 6.61527 0 6.98501 0H7.005C7.37473 0 7.6945 0.28 7.73448 0.65C8.05425 3.59 10.4126 5.94 13.3505 6.27C13.7202 6.31 14 6.63 14 7V6.99Z" fill="#71B7FB"/>
-      </svg>
-      <span>AI</span>
-    `;
-
-    button.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.toggleChat();
-    });
-
-    button.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        this.toggleChat();
-      }
-    });
-
-    return button;
-  }
 
   async toggleChat() {
     if (!this.chatOpen) {
@@ -486,14 +896,6 @@ class LinkedInAI {
         </div>
       </div>
 
-      <div class="api-key-dropdown" id="api-key-dropdown" style="display: none;">
-        <div class="dropdown-header">API Key Settings</div>
-        <input type="password" id="api-key-input" placeholder="Enter Gemini API Key" />
-        <div class="dropdown-actions">
-          <button class="dropdown-btn" id="save-api-key">Save</button>
-          <button class="dropdown-btn secondary" id="get-api-key">Get API Key</button>
-        </div>
-      </div>
     `;
 
     document.body.appendChild(chatContainer);
@@ -510,24 +912,9 @@ class LinkedInAI {
     const closeBtn = document.getElementById('chat-close-btn');
     const navbar = document.querySelector('.chat-navbar');
 
-    const toggleDropdown = async () => {
-      const dropdown = document.getElementById('api-key-dropdown');
-      const apiKeyInput = document.getElementById('api-key-input');
-      
-      if (dropdown) {
-        const isHidden = dropdown.style.display === 'none';
-        
-        if (isHidden) {
-          // Load current API key when opening dropdown
-          const { gemini_api_key } = await chrome.storage.sync.get(['gemini_api_key']);
-          if (apiKeyInput && gemini_api_key) {
-            apiKeyInput.value = gemini_api_key;
-          }
-          dropdown.style.display = 'block';
-        } else {
-          dropdown.style.display = 'none';
-        }
-      }
+    const openExtensionPopup = () => {
+      // Open the Chrome extension popup by simulating a click on the extension icon
+      chrome.runtime.sendMessage({ action: 'openPopup' });
     };
 
     const handleNewChat = async () => {
@@ -540,6 +927,9 @@ class LinkedInAI {
       // Reset message count and streaming state
       this.messageCount = 0;
       this.streamingMessageId = null;
+      
+      // Reset clicked actions tracking
+      this.clickedActions.clear();
       
       // Clear chat history from storage for current profile
       const profileHash = this.hashProfile(window.location.href);
@@ -566,7 +956,7 @@ class LinkedInAI {
       });
     };
 
-    attachButtonHandlers(menuBtn, toggleDropdown);
+    attachButtonHandlers(menuBtn, openExtensionPopup);
     attachButtonHandlers(newChatBtn, handleNewChat);
     attachButtonHandlers(closeBtn, () => this.toggleChat());
     
@@ -582,21 +972,6 @@ class LinkedInAI {
     }
 
     // API key actions
-    document.getElementById('save-api-key')?.addEventListener('click', async () => {
-      const apiKeyInput = document.getElementById('api-key-input');
-      const apiKey = apiKeyInput?.value;
-      if (apiKey) {
-        await chrome.storage.sync.set({ gemini_api_key: apiKey });
-        const dropdown = document.getElementById('api-key-dropdown');
-        if (dropdown) dropdown.style.display = 'none';
-        if (apiKeyInput) apiKeyInput.value = '';
-        alert('API key saved successfully!');
-      }
-    });
-
-    document.getElementById('get-api-key')?.addEventListener('click', () => {
-      window.open('https://aistudio.google.com/app/apikey', '_blank');
-    });
 
     // Send button
     const sendBtn = document.getElementById('send-btn');
@@ -654,6 +1029,23 @@ class LinkedInAI {
           }
         }
       });
+    }
+
+    // Prevent page scrolling when scrolling in chat viewport
+    const chatViewport = document.getElementById('chat-content');
+    if (chatViewport) {
+      chatViewport.addEventListener('wheel', (e) => {
+        // Check if we're at the top or bottom of the chat viewport
+        const { scrollTop, scrollHeight, clientHeight } = chatViewport;
+        const isAtTop = scrollTop === 0;
+        const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1; // Small tolerance for rounding
+        
+        // If scrolling up and at top, or scrolling down and at bottom, prevent page scroll
+        if ((e.deltaY < 0 && isAtTop) || (e.deltaY > 0 && isAtBottom)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }, { passive: false });
     }
 
     // Mic button - Web Speech API
@@ -723,11 +1115,21 @@ class LinkedInAI {
   handleQuickAction(displayText, backendText) {
     const chatInput = document.getElementById('chat-input');
     
+    // Track this action as clicked
+    this.clickedActions.add(displayText);
+    
+    // Hide suggestions during streaming
+    this.hideSuggestionsDuringStreaming();
+    
     // Show display text in input briefly, then send backend text to AI
     if (chatInput) {
       chatInput.value = displayText;
       chatInput.dispatchEvent(new Event('input'));
     }
+    
+    // Store user message for share sheet functionality
+    // This allows the share sheet to include the user's question for context
+    this.lastUserMessage = displayText;
     
     // Add user message with display text
     this.addMessage('user', displayText);
@@ -752,6 +1154,9 @@ class LinkedInAI {
     const message = chatInput?.value.trim();
     if (!message) return;
 
+    // Hide suggestions during streaming
+    this.hideSuggestionsDuringStreaming();
+
     // Clear input and reset height
     if (chatInput) {
     chatInput.value = '';
@@ -760,6 +1165,10 @@ class LinkedInAI {
     if (sendBtn) {
       sendBtn.disabled = true;
     }
+
+    // Store user message for share sheet functionality
+    // This allows the share sheet to include the user's question for context
+    this.lastUserMessage = message;
 
     // Add user message
     this.addMessage('user', message);
@@ -842,34 +1251,136 @@ class LinkedInAI {
     const listenIcon = actionsDiv.querySelector('.tts-listen-icon');
     const stopIcon = actionsDiv.querySelector('.tts-stop-icon');
     
-    // Share functionality: try Web Share API, fallback to copy
+    /**
+     * Share functionality: Convert HTML to image and share via multiple methods
+     * 
+     * WHY THIS APPROACH:
+     * - Users want to share AI responses as images (not just text)
+     * - Images are more visually appealing and easier to share on social media
+     * - Need robust fallbacks since sharing APIs vary by browser/platform
+     * 
+     * SHARING FLOW:
+     * 1. Try Web Share API with image file (best experience)
+     * 2. Fallback to clipboard image copy (works on most platforms)
+     * 3. Fallback to Web Share API with text (if image fails)
+     * 4. Final fallback to clipboard text copy (universal)
+     */
     const handleShare = async () => {
-      const plainText = stripMarkdown(content); // Remove markdown formatting
+      // Get the last user message to include in the share sheet
+      // This provides context for what the AI was responding to
+      const userMessage = this.lastUserMessage || 'User message';
       
-      if (navigator.share) {
-        // Web Share API available
-        try {
+      // Parse markdown to HTML for proper formatting in the image
+      // This preserves bold, italic, lists, etc. instead of showing raw markdown
+      const aiResponse = parseMarkdown(content);
+      
+      // Create HTML template for the share sheet image
+      // WHY THESE DESIGN CHOICES:
+      // - 320x480px: Standard mobile-friendly aspect ratio
+      // - System fonts: Can't load external fonts in SVG data URLs (CORS restriction)
+      // - Full width layout: Prevents text cutoff issues
+      // - White background: Clean, professional appearance
+      // - LinkedIn logo: Branding and attribution
+      const shareSheetHTML = `<div class="share-sheet" style="width: 320px; height: 480px; padding: 24px; position: relative; background: white; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; gap: 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;">
+  <div class="messages-container" style="width: 100%; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-end; gap: 10px;">
+    <div class="user-bubble" style="max-width: 224px; padding: 12px; background: rgba(0, 0, 0, 0.08); border-radius: 20px; word-wrap: break-word;">
+      <div class="user-text" style="color: rgba(0, 0, 0, 0.95); font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-weight: 400; line-height: 24px;">${userMessage}</div>
+    </div>
+  </div>
+  <div class="ai-response-text" style="width: 100%; flex: 1 1 0; overflow: hidden; color: rgba(0, 0, 0, 0.95); font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-weight: 400; line-height: 24px; word-wrap: break-word;">${aiResponse}</div>
+  <div class="logo-overlay" style="width: 320px; padding-top: 96px; padding-bottom: 24px; padding-left: 24px; padding-right: 24px; left: 0; top: 324.26px; position: absolute; background: linear-gradient(0deg, white 50%, rgba(255, 255, 255, 0) 100%); overflow: hidden; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 10px; display: flex;">
+    <div class="linkedin-logo">
+      <svg width="144" height="37" viewBox="0 0 144 37" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M110.712 0.264648C109.245 0.264648 108 1.42645 108 2.85617V33.6731C108 35.1046 108.816 36.2646 110.283 36.2646H140.963C142.432 36.2646 144 35.1046 144 33.6731V2.85617C144 1.42645 142.861 0.264648 141.392 0.264648H110.712ZM115.714 4.76465C117.49 4.76465 118.929 6.20293 118.929 7.97893C118.929 9.75493 117.49 11.1932 115.714 11.1932C113.938 11.1932 112.5 9.75493 112.5 7.97893C112.5 6.20293 113.938 4.76465 115.714 4.76465ZM21.4319 4.89185C19.7296 4.89185 18.3415 6.2749 18.3415 7.9789C18.3415 9.6829 19.7296 11.066 21.4319 11.066C23.1359 11.066 24.5156 9.6829 24.5156 7.9789C24.5156 6.2749 23.1359 4.89185 21.4319 4.89185ZM0 5.40751V31.1218H15.4286V25.9789H5.14286V5.40751H0ZM48 5.40751V31.1218H53.1429V22.5504L59.4844 31.1218H65.5547L58.2857 21.7501L65.1429 13.9789H59.1429L53.1429 20.8361V5.40751H48ZM97.7143 5.40751V16.0214H97.6641C96.6166 14.7562 94.8851 13.7646 92.0993 13.7646C87.5993 13.7646 83.9632 17.2905 83.9632 22.5705C83.9632 28.1127 87.6529 31.3361 91.9386 31.3361C95.0826 31.3361 96.9376 30.3171 98.0056 29.0794H98.0558V31.1218H102.857V5.40751H97.7143ZM37.9487 13.7646C35.2504 13.7646 33.0659 15.1179 32.327 16.4499H32.2735V13.9789H27.4286V31.1218H32.5714V22.8885C32.5714 20.312 33.8032 18.2646 36.3884 18.2646C38.5175 18.2646 39.4286 20.0202 39.4286 22.5437V31.1218H44.5714V21.6062C44.5714 17.0496 43.1275 13.7646 37.9487 13.7646ZM74.106 13.7646C68.2483 13.7646 65.1429 17.1921 65.1429 22.1687C65.1429 27.7709 68.5708 31.3361 73.9554 31.3361C77.9908 31.3361 80.4894 29.9315 81.7031 28.3595L78.5022 25.7646C77.8097 26.7058 76.2745 27.9075 74.0391 27.9075C71.4779 27.9075 70.3623 26.1006 70.0246 24.6229L69.9978 24.0939H82.192C82.192 24.0939 82.2858 23.5166 82.2858 22.9321C82.2858 17.0881 79.1649 13.7646 74.106 13.7646ZM132.234 13.7646C137.413 13.7646 138.857 16.513 138.857 21.6062V31.1218H133.714V22.5437C133.714 20.2637 132.803 18.2646 130.674 18.2646C128.089 18.2646 126.857 20.0154 126.857 22.8885V31.1218H121.714V13.9789H126.559V16.4499H126.613C127.351 15.1179 129.536 13.7646 132.234 13.7646ZM18.8571 13.9789V31.1218H24V13.9789H18.8571ZM113.143 13.9789H118.286V31.1218H113.143V13.9789ZM73.952 17.1932C76.0434 17.1932 77.3713 19.0275 77.3371 20.8361H69.9978C70.1366 19.1372 71.4629 17.1932 73.952 17.1932ZM93.3918 17.6218C96.3352 17.6218 98.0558 19.5823 98.0558 22.5068C98.0558 25.3526 96.3352 27.4789 93.3918 27.4789C90.4518 27.4789 88.8013 25.296 88.8013 22.5068C88.8013 19.7194 90.4518 17.6218 93.3918 17.6218Z" fill="#0A66C2"/>
+      </svg>
+    </div>
+  </div>
+</div>`;
+      
+      try {
+        // STEP 1: Convert HTML to PNG image blob
+        // This uses our htmlToImage function with SVG foreignObject approach
+        console.log('Attempting to create share image...');
+        const imageBlob = await htmlToImage(shareSheetHTML);
+        console.log('Image blob created:', imageBlob);
+        
+        // Create File object from blob for Web Share API
+        // File objects are required for sharing images via Web Share API
+        const imageFile = new File([imageBlob], 'ai-response.png', { type: 'image/png' });
+        
+        // STEP 2: Try Web Share API with image file (best user experience)
+        // Check if browser supports file sharing via Web Share API
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+          console.log('Sharing image via Web Share API...');
           await navigator.share({
-            text: plainText,
+            files: [imageFile],
             title: 'AI Response'
           });
-        } catch (err) {
-          if (err.name !== 'AbortError') {
-            console.error('Share failed:', err);
+          console.log('Image shared successfully');
+          return; // Success - exit early
+        } 
+        
+        // STEP 3: Fallback to clipboard image copy
+        // This works on most platforms (mobile and desktop)
+        console.log('File sharing not supported, copying image to clipboard...');
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'image/png': imageBlob
+          })
+        ]);
+        console.log('Image copied to clipboard');
+        
+        // Show visual feedback: hide share icon, show checkmark
+        if (shareIcon) shareIcon.style.display = 'none';
+        if (shareCheckmark) shareCheckmark.style.display = 'flex';
+        setTimeout(() => {
+          if (shareIcon) shareIcon.style.display = 'flex';
+          if (shareCheckmark) shareCheckmark.style.display = 'none';
+        }, 2000);
+        
+      } catch (err) {
+        // STEP 4: Image sharing failed, fallback to text sharing
+        console.error('Image share/copy failed:', err.message);
+        
+        // Strip markdown for plain text sharing
+        const plainText = stripMarkdown(content);
+        
+        // STEP 5: Try Web Share API with text
+        if (navigator.share) {
+          try {
+            console.log('Sharing text via Web Share API...');
+            await navigator.share({
+              title: 'AI Response',
+              text: plainText
+            });
+            console.log('Text shared successfully');
+            return; // Success - exit early
+          } catch (shareErr) {
+            // Handle user cancellation gracefully
+            if (shareErr.name === 'AbortError') {
+              console.log('Share cancelled by user');
+              return;
+            }
+            console.log('Text share failed, copying to clipboard...');
           }
         }
-      } else {
-        // Fallback: copy to clipboard and show checkmark
+        
+        // STEP 6: Final fallback - Copy text to clipboard
+        // This works universally across all browsers and platforms
         try {
           await navigator.clipboard.writeText(plainText);
+          console.log('Text copied to clipboard');
+          
+          // Show visual feedback
           if (shareIcon) shareIcon.style.display = 'none';
           if (shareCheckmark) shareCheckmark.style.display = 'flex';
           setTimeout(() => {
             if (shareIcon) shareIcon.style.display = 'flex';
             if (shareCheckmark) shareCheckmark.style.display = 'none';
           }, 2000);
-        } catch (err) {
-          console.error('Copy failed:', err);
+        } catch (textErr) {
+          // All sharing methods have failed
+          console.error('All share methods failed:', textErr);
         }
       }
     };
@@ -903,8 +1414,8 @@ class LinkedInAI {
     }
     
     if (thumbsDownIcon) {
-      thumbsDownIcon.addEventListener('click', () => console.log('Thumbs down clicked'));
-      thumbsDownIcon.addEventListener('keydown', (event) => handleKeyActivation(event, () => console.log('Thumbs down')));
+      thumbsDownIcon.addEventListener('click', () => this.showFeedbackPopup());
+      thumbsDownIcon.addEventListener('keydown', (event) => handleKeyActivation(event, () => this.showFeedbackPopup()));
     }
 
     const toggleTTSState = (listening) => {
@@ -915,46 +1426,36 @@ class LinkedInAI {
 
     let currentUtterance = null;
 
-    const startTTS = () => {
-      if (!window.speechSynthesis) {
-        console.error('TTS not supported');
-        return;
-      }
-
+    const startTTS = async () => {
       // Stop any ongoing speech
-      window.speechSynthesis.cancel();
-
-      // Get plain text content (no markdown)
-      const plainText = content;
-      
-      currentUtterance = new SpeechSynthesisUtterance(plainText);
-      currentUtterance.rate = 1.0;
-      currentUtterance.pitch = 1.0;
-      currentUtterance.volume = 1.0;
-      
-      currentUtterance.onstart = () => {
-        toggleTTSState(true);
-      };
-      
-      currentUtterance.onend = () => {
-        toggleTTSState(false);
-        currentUtterance = null;
-      };
-      
-      currentUtterance.onerror = () => {
-        toggleTTSState(false);
-        currentUtterance = null;
-      };
-      
-      window.speechSynthesis.speak(currentUtterance);
-    };
-
-    const stopTTS = () => {
+      if (this.currentAudio) {
+        this.currentAudio.pause();
+        this.currentAudio = null;
+      }
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
+
+      // Get plain text content (no markdown)
+      const plainText = stripMarkdown(content);
+      
+      // Use native browser TTS directly
+      this.startBrowserTTS(plainText, toggleTTSState);
+    };
+
+    const stopTTS = () => {
+      if (this.currentAudio) {
+        this.currentAudio.pause();
+        this.currentAudio = null;
+      }
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      if (this.currentUtterance) {
+        this.currentUtterance = null;
+      }
       toggleTTSState(false);
-      currentUtterance = null;
+      this.currentTTSMessageId = null;
     };
 
     if (listenIcon) {
@@ -1102,11 +1603,22 @@ class LinkedInAI {
       const { gemini_api_key } = await chrome.storage.sync.get(['gemini_api_key']);
       if (!gemini_api_key) return null;
 
-      const prompt = `Based on this AI response, generate 3 very short (2-5 words each) follow-up questions or statements that a user would naturally say next. These should be conversational and feel like what the user would actually type. Return ONLY a JSON array of strings, no other text.
+      const prompt = `Based on this AI response, generate 3 very short (2-5 words each) follow-up questions or statements that a user would naturally say next. These should be conversational, relevant, and feel like what the user would actually type in a chat. Focus on natural curiosity, clarification, or next steps. Return ONLY a JSON array of strings, no other text.
 
 AI Response: "${aiResponse.substring(0, 500)}"
 
-Example format: ["Tell me more", "What about skills?", "Draft a message"]`;
+Examples of good suggestions:
+- "What's his biggest win?"
+- "How long at Lenovo?"
+- "What's his leadership style?"
+- "Make it sound friendlier"
+- "Focus on hardware instead"
+- "What's his biggest focus?"
+- "What about his background?"
+- "Any interesting projects?"
+- "How to highlight my achievements?"
+
+Return format: ["suggestion1", "suggestion2", "suggestion3"]`;
 
       // Call Gemini API directly for suggestions (non-streaming, quick response)
       const response = await fetch(
@@ -1145,6 +1657,9 @@ Example format: ["Tell me more", "What about skills?", "Draft a message"]`;
   updateQuickActions(suggestions) {
     const quickActionsContainer = document.getElementById('quick-actions');
     if (!quickActionsContainer) return;
+
+    // Show the container if it was hidden during streaming
+    quickActionsContainer.style.display = '';
 
     // Clear existing actions
     quickActionsContainer.innerHTML = '';
@@ -1220,14 +1735,7 @@ Clean, simple sentence about how to improve my profile for this company
       quickActionsContainer.innerHTML = `
         <div data-layer="summarize" class="quick-action" 
              data-action="Summarize" 
-             data-backend-action="Write a human summary like you're telling your mom about this person (but don't actually say that). Focus on who they are as a person, what they're passionate about, and how to start a conversation with them. Focus on what makes them relatable.
-
-Include: where they live/work, where/what they did for work/school, what they're into (hobbies, interests), their personality vibe, and relevant, non-weird conversation starters. Use normal words people actually say. Still be polite and friendly.
-
-ONLY OUTPUT THIS EXACT FORMAT AND NOTHING ELSE:
-Clean, simple sentence about who they are as a person
-
-• [Emoji] [1-5 human, short & succinct, conversational points about their personality, interests, and sometimes how to connect with them]"
+             data-backend-action="Analyze this LinkedIn profile and create a concise, professional summary. Focus on key achievements, skills, work experience, education, and hobbies, and interests. Keep it under 200 words and make it easy to understand. Be specific and highlight what makes this person unique. No jargon, people use in everyday conversation."
              role="button" tabindex="0" aria-label="Summarize">
           <div data-layer="Summarize">Summarize</div>
         </div>
@@ -1319,15 +1827,71 @@ Clean, simple sentence about how to improve my profile for this person
     // Attach event listeners to action buttons
     this.attachMessageActionListeners(actionsDiv, content);
     
-    // Generate and display follow-up suggestions
+    // Generate AI follow-up suggestions based on the response content
     this.generateFollowUpSuggestions(content).then(suggestions => {
       if (suggestions && suggestions.length > 0) {
         this.updateQuickActions(suggestions);
+      } else {
+        // Fallback to contextual suggestions if AI suggestions fail
+        this.showContextualSuggestions();
       }
     });
     
     // Clear streaming message ID
     this.streamingMessageId = null;
+  }
+
+  hideSuggestionsDuringStreaming() {
+    const quickActionsContainer = document.getElementById('quick-actions');
+    if (quickActionsContainer) {
+      quickActionsContainer.style.display = 'none';
+    }
+  }
+
+  showContextualSuggestions() {
+    const quickActionsContainer = document.getElementById('quick-actions');
+    if (!quickActionsContainer) return;
+
+    // Get the last clicked action
+    const lastClickedAction = Array.from(this.clickedActions).pop();
+    
+    // Define contextual suggestions based on last clicked action
+    const contextualSuggestions = this.getContextualSuggestions(lastClickedAction);
+    
+    // Update quick actions with contextual suggestions
+    this.updateQuickActions(contextualSuggestions);
+  }
+
+  getContextualSuggestions(lastClickedAction) {
+    const suggestions = [];
+    
+    // Define contextual suggestions based on action
+    switch (lastClickedAction) {
+      case 'Summarize':
+        suggestions.push('Draft messages', 'Improve my profile');
+        break;
+      case 'Draft messages':
+        suggestions.push('Summarize', 'Improve my profile');
+        break;
+      case 'Improve my profile':
+        suggestions.push('Summarize', 'Draft messages');
+        break;
+      case 'Use cases':
+        suggestions.push('Summarize', 'Draft messages');
+        break;
+      case 'Company culture':
+        suggestions.push('Summarize', 'Use cases');
+        break;
+      case 'Interview prep':
+        suggestions.push('Summarize', 'Draft messages');
+        break;
+      default:
+        // Default suggestions for unknown actions
+        suggestions.push('Summarize', 'Draft messages', 'Improve my profile');
+    }
+    
+    // Filter out already clicked actions
+    return suggestions.filter(action => !this.clickedActions.has(action));
   }
 
   attachMessageActionListeners(actionsDiv, content) {
@@ -1336,34 +1900,136 @@ Clean, simple sentence about how to improve my profile for this person
     const listenIcon = actionsDiv.querySelector('.tts-listen-icon');
     const stopIcon = actionsDiv.querySelector('.tts-stop-icon');
 
-    // Share functionality: try Web Share API, fallback to copy
+    /**
+     * Share functionality: Convert HTML to image and share via multiple methods
+     * 
+     * WHY THIS APPROACH:
+     * - Users want to share AI responses as images (not just text)
+     * - Images are more visually appealing and easier to share on social media
+     * - Need robust fallbacks since sharing APIs vary by browser/platform
+     * 
+     * SHARING FLOW:
+     * 1. Try Web Share API with image file (best experience)
+     * 2. Fallback to clipboard image copy (works on most platforms)
+     * 3. Fallback to Web Share API with text (if image fails)
+     * 4. Final fallback to clipboard text copy (universal)
+     */
     const handleShare = async () => {
-      const plainText = stripMarkdown(content); // Remove markdown formatting
+      // Get the last user message to include in the share sheet
+      // This provides context for what the AI was responding to
+      const userMessage = this.lastUserMessage || 'User message';
       
-      if (navigator.share) {
-        // Web Share API available
-        try {
+      // Parse markdown to HTML for proper formatting in the image
+      // This preserves bold, italic, lists, etc. instead of showing raw markdown
+      const aiResponse = parseMarkdown(content);
+      
+      // Create HTML template for the share sheet image
+      // WHY THESE DESIGN CHOICES:
+      // - 320x480px: Standard mobile-friendly aspect ratio
+      // - System fonts: Can't load external fonts in SVG data URLs (CORS restriction)
+      // - Full width layout: Prevents text cutoff issues
+      // - White background: Clean, professional appearance
+      // - LinkedIn logo: Branding and attribution
+      const shareSheetHTML = `<div class="share-sheet" style="width: 320px; height: 480px; padding: 24px; position: relative; background: white; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; gap: 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;">
+  <div class="messages-container" style="width: 100%; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-end; gap: 10px;">
+    <div class="user-bubble" style="max-width: 224px; padding: 12px; background: rgba(0, 0, 0, 0.08); border-radius: 20px; word-wrap: break-word;">
+      <div class="user-text" style="color: rgba(0, 0, 0, 0.95); font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-weight: 400; line-height: 24px;">${userMessage}</div>
+    </div>
+  </div>
+  <div class="ai-response-text" style="width: 100%; flex: 1 1 0; overflow: hidden; color: rgba(0, 0, 0, 0.95); font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-weight: 400; line-height: 24px; word-wrap: break-word;">${aiResponse}</div>
+  <div class="logo-overlay" style="width: 320px; padding-top: 96px; padding-bottom: 24px; padding-left: 24px; padding-right: 24px; left: 0; top: 324.26px; position: absolute; background: linear-gradient(0deg, white 50%, rgba(255, 255, 255, 0) 100%); overflow: hidden; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 10px; display: flex;">
+    <div class="linkedin-logo">
+      <svg width="144" height="37" viewBox="0 0 144 37" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M110.712 0.264648C109.245 0.264648 108 1.42645 108 2.85617V33.6731C108 35.1046 108.816 36.2646 110.283 36.2646H140.963C142.432 36.2646 144 35.1046 144 33.6731V2.85617C144 1.42645 142.861 0.264648 141.392 0.264648H110.712ZM115.714 4.76465C117.49 4.76465 118.929 6.20293 118.929 7.97893C118.929 9.75493 117.49 11.1932 115.714 11.1932C113.938 11.1932 112.5 9.75493 112.5 7.97893C112.5 6.20293 113.938 4.76465 115.714 4.76465ZM21.4319 4.89185C19.7296 4.89185 18.3415 6.2749 18.3415 7.9789C18.3415 9.6829 19.7296 11.066 21.4319 11.066C23.1359 11.066 24.5156 9.6829 24.5156 7.9789C24.5156 6.2749 23.1359 4.89185 21.4319 4.89185ZM0 5.40751V31.1218H15.4286V25.9789H5.14286V5.40751H0ZM48 5.40751V31.1218H53.1429V22.5504L59.4844 31.1218H65.5547L58.2857 21.7501L65.1429 13.9789H59.1429L53.1429 20.8361V5.40751H48ZM97.7143 5.40751V16.0214H97.6641C96.6166 14.7562 94.8851 13.7646 92.0993 13.7646C87.5993 13.7646 83.9632 17.2905 83.9632 22.5705C83.9632 28.1127 87.6529 31.3361 91.9386 31.3361C95.0826 31.3361 96.9376 30.3171 98.0056 29.0794H98.0558V31.1218H102.857V5.40751H97.7143ZM37.9487 13.7646C35.2504 13.7646 33.0659 15.1179 32.327 16.4499H32.2735V13.9789H27.4286V31.1218H32.5714V22.8885C32.5714 20.312 33.8032 18.2646 36.3884 18.2646C38.5175 18.2646 39.4286 20.0202 39.4286 22.5437V31.1218H44.5714V21.6062C44.5714 17.0496 43.1275 13.7646 37.9487 13.7646ZM74.106 13.7646C68.2483 13.7646 65.1429 17.1921 65.1429 22.1687C65.1429 27.7709 68.5708 31.3361 73.9554 31.3361C77.9908 31.3361 80.4894 29.9315 81.7031 28.3595L78.5022 25.7646C77.8097 26.7058 76.2745 27.9075 74.0391 27.9075C71.4779 27.9075 70.3623 26.1006 70.0246 24.6229L69.9978 24.0939H82.192C82.192 24.0939 82.2858 23.5166 82.2858 22.9321C82.2858 17.0881 79.1649 13.7646 74.106 13.7646ZM132.234 13.7646C137.413 13.7646 138.857 16.513 138.857 21.6062V31.1218H133.714V22.5437C133.714 20.2637 132.803 18.2646 130.674 18.2646C128.089 18.2646 126.857 20.0154 126.857 22.8885V31.1218H121.714V13.9789H126.559V16.4499H126.613C127.351 15.1179 129.536 13.7646 132.234 13.7646ZM18.8571 13.9789V31.1218H24V13.9789H18.8571ZM113.143 13.9789H118.286V31.1218H113.143V13.9789ZM73.952 17.1932C76.0434 17.1932 77.3713 19.0275 77.3371 20.8361H69.9978C70.1366 19.1372 71.4629 17.1932 73.952 17.1932ZM93.3918 17.6218C96.3352 17.6218 98.0558 19.5823 98.0558 22.5068C98.0558 25.3526 96.3352 27.4789 93.3918 27.4789C90.4518 27.4789 88.8013 25.296 88.8013 22.5068C88.8013 19.7194 90.4518 17.6218 93.3918 17.6218Z" fill="#0A66C2"/>
+      </svg>
+    </div>
+  </div>
+</div>`;
+      
+      try {
+        // STEP 1: Convert HTML to PNG image blob
+        // This uses our htmlToImage function with SVG foreignObject approach
+        console.log('Attempting to create share image...');
+        const imageBlob = await htmlToImage(shareSheetHTML);
+        console.log('Image blob created:', imageBlob);
+        
+        // Create File object from blob for Web Share API
+        // File objects are required for sharing images via Web Share API
+        const imageFile = new File([imageBlob], 'ai-response.png', { type: 'image/png' });
+        
+        // STEP 2: Try Web Share API with image file (best user experience)
+        // Check if browser supports file sharing via Web Share API
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+          console.log('Sharing image via Web Share API...');
           await navigator.share({
-            text: plainText,
+            files: [imageFile],
             title: 'AI Response'
           });
-        } catch (err) {
-          if (err.name !== 'AbortError') {
-            console.error('Share failed:', err);
+          console.log('Image shared successfully');
+          return; // Success - exit early
+        } 
+        
+        // STEP 3: Fallback to clipboard image copy
+        // This works on most platforms (mobile and desktop)
+        console.log('File sharing not supported, copying image to clipboard...');
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'image/png': imageBlob
+          })
+        ]);
+        console.log('Image copied to clipboard');
+        
+        // Show visual feedback: hide share icon, show checkmark
+        if (shareIcon) shareIcon.style.display = 'none';
+        if (shareCheckmark) shareCheckmark.style.display = 'flex';
+        setTimeout(() => {
+          if (shareIcon) shareIcon.style.display = 'flex';
+          if (shareCheckmark) shareCheckmark.style.display = 'none';
+        }, 2000);
+        
+      } catch (err) {
+        // STEP 4: Image sharing failed, fallback to text sharing
+        console.error('Image share/copy failed:', err.message);
+        
+        // Strip markdown for plain text sharing
+        const plainText = stripMarkdown(content);
+        
+        // STEP 5: Try Web Share API with text
+        if (navigator.share) {
+          try {
+            console.log('Sharing text via Web Share API...');
+            await navigator.share({
+              title: 'AI Response',
+              text: plainText
+            });
+            console.log('Text shared successfully');
+            return; // Success - exit early
+          } catch (shareErr) {
+            // Handle user cancellation gracefully
+            if (shareErr.name === 'AbortError') {
+              console.log('Share cancelled by user');
+              return;
+            }
+            console.log('Text share failed, copying to clipboard...');
           }
         }
-      } else {
-        // Fallback: copy to clipboard and show checkmark
+        
+        // STEP 6: Final fallback - Copy text to clipboard
+        // This works universally across all browsers and platforms
         try {
           await navigator.clipboard.writeText(plainText);
+          console.log('Text copied to clipboard');
+          
+          // Show visual feedback
           if (shareIcon) shareIcon.style.display = 'none';
           if (shareCheckmark) shareCheckmark.style.display = 'flex';
           setTimeout(() => {
             if (shareIcon) shareIcon.style.display = 'flex';
             if (shareCheckmark) shareCheckmark.style.display = 'none';
           }, 2000);
-        } catch (err) {
-          console.error('Copy failed:', err);
+        } catch (textErr) {
+          // All sharing methods have failed
+          console.error('All share methods failed:', textErr);
         }
       }
     };
@@ -1393,8 +2059,8 @@ Clean, simple sentence about how to improve my profile for this person
     }
     
     if (thumbsDownIcon) {
-      thumbsDownIcon.addEventListener('click', () => console.log('Thumbs down clicked'));
-      thumbsDownIcon.addEventListener('keydown', (event) => handleKeyActivation(event, () => console.log('Thumbs down')));
+      thumbsDownIcon.addEventListener('click', () => this.showFeedbackPopup());
+      thumbsDownIcon.addEventListener('keydown', (event) => handleKeyActivation(event, () => this.showFeedbackPopup()));
     }
 
     const toggleTTSState = (listening) => {
@@ -1405,32 +2071,36 @@ Clean, simple sentence about how to improve my profile for this person
 
     let currentUtterance = null;
 
-    const startTTS = () => {
-      if (!window.speechSynthesis) {
-        console.error('TTS not supported');
-        return;
+    const startTTS = async () => {
+      // Stop any ongoing speech
+      if (this.currentAudio) {
+        this.currentAudio.pause();
+        this.currentAudio = null;
       }
-      window.speechSynthesis.cancel();
-      currentUtterance = new SpeechSynthesisUtterance(content);
-      currentUtterance.rate = 1.0;
-      currentUtterance.pitch = 1.0;
-      currentUtterance.volume = 1.0;
-      currentUtterance.onstart = () => toggleTTSState(true);
-      currentUtterance.onend = () => {
-        toggleTTSState(false);
-        currentUtterance = null;
-      };
-      currentUtterance.onerror = () => {
-        toggleTTSState(false);
-        currentUtterance = null;
-      };
-      window.speechSynthesis.speak(currentUtterance);
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+
+      // Get plain text content (no markdown)
+      const plainText = stripMarkdown(content);
+      
+      // Use native browser TTS directly
+      this.startBrowserTTS(plainText, toggleTTSState);
     };
 
     const stopTTS = () => {
-      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      if (this.currentAudio) {
+        this.currentAudio.pause();
+        this.currentAudio = null;
+      }
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      if (this.currentUtterance) {
+        this.currentUtterance = null;
+      }
       toggleTTSState(false);
-      currentUtterance = null;
+      this.currentTTSMessageId = null;
     };
 
     if (listenIcon) {
@@ -1611,6 +2281,9 @@ ${profile.dom}`;
         return profile;
       }
       
+      // Wait 3 seconds for profile to fully load before parsing
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
       // Use the LinkedInScraper utility
       let profile;
       if (typeof LinkedInScraper !== 'undefined') {
@@ -1751,6 +2424,238 @@ ${profile.dom}`;
     });
   }
 
+  showFeedbackPopup() {
+    const modal = document.createElement('div');
+    modal.className = 'feedback-modal';
+    modal.innerHTML = `
+      <div class="feedback-modal-content">
+        <div class="feedback-modal-header">
+          <h3 class="feedback-modal-title">Tell us more</h3>
+          <button class="feedback-modal-close" id="feedback-close-btn">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22 11.41L17.41 16L22 20.59L20.59 22L16 17.41L11.41 22L10 20.59L14.59 16L10 11.41L11.41 10L16 14.59L20.59 10L22 11.41Z" fill="white" fill-opacity="0.65"/>
+            </svg>
+          </button>
+        </div>
+        <div class="feedback-modal-intro">
+          <p class="feedback-modal-intro-text">Your feedback helps us improve.</p>
+          <p class="feedback-modal-intro-subtext">Tell us why you don't find this helpful</p>
+        </div>
+        <div class="feedback-modal-options">
+          <div class="feedback-option" data-value="inaccuracies">
+            <div class="feedback-radio"></div>
+            <span class="feedback-option-text">Contains inaccuracies</span>
+          </div>
+          <div class="feedback-option" data-value="wrong-focus">
+            <div class="feedback-radio"></div>
+            <span class="feedback-option-text">Focuses on the wrong things</span>
+          </div>
+          <div class="feedback-option" data-value="generic">
+            <div class="feedback-radio"></div>
+            <span class="feedback-option-text">Feels generic or robotic</span>
+          </div>
+          <div class="feedback-option" data-value="too-long">
+            <div class="feedback-radio"></div>
+            <span class="feedback-option-text">Too long and exhaustive</span>
+          </div>
+          <div class="feedback-option" data-value="offensive">
+            <div class="feedback-radio"></div>
+            <span class="feedback-option-text">Uses offensive, biased, or harmful language</span>
+          </div>
+          <div class="feedback-option" data-value="none">
+            <div class="feedback-radio"></div>
+            <span class="feedback-option-text">None of these</span>
+          </div>
+        </div>
+        <div class="feedback-modal-actions">
+          <button class="feedback-modal-cancel" id="feedback-cancel-btn">Cancel</button>
+          <button class="feedback-modal-submit" id="feedback-submit-btn">Submit</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    let selectedOption = null;
+
+    // Handle option selection
+    const options = modal.querySelectorAll('.feedback-option');
+    options.forEach(option => {
+      option.addEventListener('click', () => {
+        // Remove previous selection
+        options.forEach(opt => opt.querySelector('.feedback-radio').classList.remove('selected'));
+        
+        // Add selection to clicked option
+        option.querySelector('.feedback-radio').classList.add('selected');
+        selectedOption = option.dataset.value;
+      });
+    });
+
+    // Handle close button
+    modal.querySelector('#feedback-close-btn').addEventListener('click', () => {
+      modal.remove();
+    });
+
+    // Handle cancel button
+    modal.querySelector('#feedback-cancel-btn').addEventListener('click', () => {
+      modal.remove();
+    });
+
+    // Handle submit button
+    modal.querySelector('#feedback-submit-btn').addEventListener('click', () => {
+      console.log('Feedback submitted:', selectedOption || 'No option selected');
+      // Here you could send the feedback to your backend or storage
+      modal.remove();
+    });
+
+    // Close modal when clicking outside
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
+  }
+
+  // Handle TTS audio data from Gemini API
+  handleTTSAudio(audioData, text) {
+    try {
+      // Convert base64 audio data to blob
+      const audioBlob = this.base64ToBlob(audioData.data, audioData.mimeType);
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      // Create audio element and play
+      const audio = new Audio(audioUrl);
+      this.currentAudio = audio;
+      
+      audio.onended = () => {
+        this.currentAudio = null;
+        URL.revokeObjectURL(audioUrl);
+        // Update TTS button state
+        this.updateTTSButtonState(false);
+      };
+      
+      audio.onerror = (error) => {
+        console.error('TTS audio playback error:', error);
+        this.currentAudio = null;
+        URL.revokeObjectURL(audioUrl);
+        this.updateTTSButtonState(false);
+      };
+      
+      audio.play();
+    } catch (error) {
+      console.error('Error handling TTS audio:', error);
+      this.updateTTSButtonState(false);
+    }
+  }
+  
+  // Handle TTS audio URL from Gemini API
+  handleTTSAudioURL(audioUrl, text) {
+    try {
+      const audio = new Audio(audioUrl);
+      this.currentAudio = audio;
+      
+      audio.onended = () => {
+        this.currentAudio = null;
+        this.updateTTSButtonState(false);
+      };
+      
+      audio.onerror = (error) => {
+        console.error('TTS audio URL playback error:', error);
+        this.currentAudio = null;
+        this.updateTTSButtonState(false);
+      };
+      
+      audio.play();
+    } catch (error) {
+      console.error('Error handling TTS audio URL:', error);
+      this.updateTTSButtonState(false);
+    }
+  }
+  
+  // Convert base64 to blob
+  base64ToBlob(base64Data, mimeType) {
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
+  }
+  
+  // Update TTS button state across all messages
+  updateTTSButtonState(isPlaying) {
+    const allListenIcons = document.querySelectorAll('.tts-listen-icon');
+    const allStopIcons = document.querySelectorAll('.tts-stop-icon');
+    
+    allListenIcons.forEach(icon => {
+      icon.style.display = isPlaying ? 'none' : 'flex';
+    });
+    
+    allStopIcons.forEach(icon => {
+      icon.style.display = isPlaying ? 'flex' : 'none';
+    });
+  }
+  
+  // Native browser TTS implementation
+  startBrowserTTS(plainText, toggleTTSState) {
+    if (!window.speechSynthesis) {
+      console.error('TTS not supported');
+      toggleTTSState(false);
+      return;
+    }
+    
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(plainText);
+    
+    // Configure speech settings
+    utterance.rate = 0.9; // Slightly slower for better comprehension
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    // Try to use a more natural voice if available
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      // Prefer English voices, especially female voices for better clarity
+      const preferredVoice = voices.find(voice => 
+        voice.lang.startsWith('en') && voice.name.includes('Female')
+      ) || voices.find(voice => 
+        voice.lang.startsWith('en') && voice.name.includes('Google')
+      ) || voices.find(voice => 
+        voice.lang.startsWith('en')
+      ) || voices[0];
+      
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+      }
+    }
+    
+    // Store utterance reference for potential cancellation
+    this.currentUtterance = utterance;
+    
+    utterance.onstart = () => {
+      console.log('TTS started');
+      toggleTTSState(true);
+    };
+    
+    utterance.onend = () => {
+      console.log('TTS ended');
+      this.currentUtterance = null;
+      toggleTTSState(false);
+    };
+    
+    utterance.onerror = (error) => {
+      console.error('Browser TTS error:', error);
+      this.currentUtterance = null;
+      toggleTTSState(false);
+    };
+    
+    // Start speaking
+    window.speechSynthesis.speak(utterance);
+  }
+
   observeProfileChanges() {
     let lastUrl = window.location.href;
     let checkCount = 0;
@@ -1763,15 +2668,17 @@ ${profile.dom}`;
         lastUrl = currentUrl;
         console.log('LinkedIn AI: Profile/Company navigation detected:', currentUrl);
         
-        // Remove old button
-        const oldButton = document.getElementById('linkedin-ai-button');
-        if (oldButton) {
-          console.log('LinkedIn AI: Removing old button');
-          oldButton.remove();
+        // Remove old premium section if it exists
+        const oldSection = document.getElementById('linkedin-ai-premium-section');
+        if (oldSection) {
+          oldSection.remove();
         }
         
-        // Inject new button
-        setTimeout(() => this.injectAIButton(), 1000);
+        // Wait a bit for LinkedIn to render the new profile, then inject button and section
+        setTimeout(() => {
+          this.injectAIButton();
+          this.injectAIPremiumSection();
+        }, 1000);
         
         // If chat is open, switch context
         if (this.chatOpen) {
@@ -1790,7 +2697,7 @@ ${profile.dom}`;
         }
       }
       
-      // Re-inject button if it disappears (LinkedIn removes it)
+      // Re-inject button and section if they disappear (LinkedIn removes them)
       // Only check every 10 mutations to reduce overhead
       checkCount++;
       if (checkCount % 10 === 0 && (window.location.href.includes('/in/') || window.location.href.includes('/company/'))) {
@@ -1798,6 +2705,12 @@ ${profile.dom}`;
         if (!button || !button.isConnected) {
           console.log('LinkedIn AI: Button was removed by LinkedIn, re-injecting...');
           setTimeout(() => this.injectAIButton(), 500);
+        }
+        
+        const section = document.getElementById('linkedin-ai-premium-section');
+        if (window.location.href.match(/linkedin\.com\/in\/[^/]+\/?$/) && (!section || !section.isConnected)) {
+          console.log('LinkedIn AI: Premium section was removed by LinkedIn, re-injecting...');
+          setTimeout(() => this.injectAIPremiumSection(), 500);
         }
       }
     });
@@ -1843,6 +2756,27 @@ window.LinkedInAI_Debug = {
   injectButton: () => {
     const ai = new LinkedInAI();
     ai.injectAIButton();
+  },
+  injectPremiumSection: () => {
+    const ai = new LinkedInAI();
+    ai.injectAIPremiumSection();
+  },
+  findInsertionPoint: () => {
+    const ai = new LinkedInAI();
+    const point = ai.findPremiumSectionInsertionPoint();
+    if (point) {
+      console.log('Found insertion point:', point);
+      point.style.border = '2px solid blue';
+      return point;
+    } else {
+      console.log('No insertion point found');
+    }
+  },
+  getProfileName: () => {
+    const ai = new LinkedInAI();
+    const name = ai.extractProfileName();
+    console.log('Profile name:', name);
+    return name;
   }
 };
 
