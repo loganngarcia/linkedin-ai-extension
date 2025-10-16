@@ -15,12 +15,11 @@ An AI-powered chat assistant for LinkedIn profiles using Google's Gemini 2.5 Fla
 
 ## Installation
 
-1. Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Clone this repository or download the ZIP
-3. Open Chrome and navigate to `chrome://extensions/`
-4. Enable "Developer mode" in the top right
-5. Click "Load unpacked" and select the extension directory
-6. The extension is now installed!
+1. Download the ZIP
+2. Open Chrome and navigate to `chrome://extensions/`
+3. Enable "Developer mode" in the top right
+4. Click "Load unpacked" and select the extension directory
+5. The extension is now installed!
 
 ## Usage
 
