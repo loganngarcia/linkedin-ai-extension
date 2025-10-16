@@ -15,7 +15,7 @@ An AI-powered chat assistant for LinkedIn profiles using Google's Gemini 2.5 Fla
 
 ## Installation
 
-1. Download the ZIP [https://github.com/loganngarcia/linkedin-ai-extension/archive/refs/heads/main.zip]
+1. [Download the ZIP](https://github.com/loganngarcia/linkedin-ai-extension/archive/refs/heads/main.zip)
 2. Open Chrome and navigate to `chrome://extensions/`
 3. Enable "Developer mode" in the top right
 4. Click "Load unpacked" and select the extension directory
